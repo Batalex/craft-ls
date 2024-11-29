@@ -1,0 +1,33 @@
+[project]
+name = "craft-ls"
+dynamic = ["version"]
+description = "A Language Server Protocol implementation for *craft files."
+readme = "README.md"
+authors = [
+  { name = "Alex Batisse", email = "alex.batisse@canonical.com" },
+]
+requires-python = ">=3.10"
+dependencies = [
+  "pygls>=1.1.0",
+  "lsprotocol>=2023.0.0",
+  "jsonschema>=4.23.0",
+  "pyyaml>=6.0.2",
+]
+
+[dependency-groups]
+fmt = [
+  "ruff >=0.8.0,<0.9.0",
+]
+lint = [
+  "ruff >=0.8.0,<0.9.0",
+]
+
+[project.scripts]
+craft-ls = "craft_ls.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/craft_ls/__init__.py"
