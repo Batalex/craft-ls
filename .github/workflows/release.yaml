@@ -1,0 +1,100 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build wheel
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.build.outputs.VERSION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for tag and build package
+        id: build
+        run: |
+          VERSION=$(python -c "import src.craft_ls;print(src.craft_ls.__version__)")
+          if [ "$(git tag -l "${VERSION}")" ]; then
+            echo "Tag ${VERSION} already exists. Please bump the project to a greater version."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          uv build
+
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: distfiles
+          path: dist/
+
+  upload-github:
+    name: Publish to GitHub
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # IMPORTANT: mandatory for making GitHub Releases
+      id-token: write # IMPORTANT: mandatory for sigstore
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: distfiles
+          path: dist/
+
+      - name: Sign the dists with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+
+      - name: Create GitHub release
+        run: |
+          git tag '${{ needs.build.outputs.VERSION }}'
+          git push origin '${{ needs.build.outputs.VERSION }}'
+          gh release create '${{ needs.build.outputs.VERSION }}' --generate-notes --title '${{ needs.build.outputs.VERSION }}'
+          gh release upload '${{ needs.build.outputs.VERSION }}' dist/*.{tar.gz,whl}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-pypi:
+    name: Publish to PyPI
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: distfiles
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+    permissions:
+      id-token: write # Needed for trusted publishing (https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/)

@@ -1,0 +1,55 @@
+[project]
+name = "craft-ls"
+dynamic = ["version"]
+description = "A Language Server Protocol implementation for *craft files."
+readme = "README.md"
+authors = [
+  { name = "Alex Batisse", email = "alex.batisse@canonical.com" },
+]
+requires-python = ">=3.10"
+dependencies = [
+  "pygls>=1.1.0",
+  "lsprotocol>=2023.0.0",
+  "jsonschema>=4.23.0",
+  "pyyaml>=6.0.2",
+]
+
+[dependency-groups]
+fmt = [
+  "ruff >=0.8.0,<0.9.0",
+]
+lint = [
+  "ruff >=0.8.0,<0.9.0",
+]
+unit = [
+  "pytest>=8.3.4",
+  "pytest-lsp>=0.4.3",
+]
+
+[project.scripts]
+craft-ls = "craft_ls.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/craft_ls/__init__.py"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "C", "N", "D", "I001"]
+ignore = ["E501", "D107"]
+extend-ignore = [
+  "D203",
+  "D204",
+  "D213",
+  "D215",
+  "D400",
+  "D401",
+  "D404",
+  "D406",
+  "D407",
+  "D408",
+  "D409",
+  "D413",
+]

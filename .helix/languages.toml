@@ -1,0 +1,10 @@
+[[language]]
+name = "yaml"
+language-servers = ["craft-ls"]
+
+[language.formatter]
+args = ["fmt", "--stdin", "yaml"]
+command = "dprint"
+
+[language-server.craft-ls]
+command = "craft-ls"
