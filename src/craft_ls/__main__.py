@@ -1,12 +1,15 @@
+"""Application module."""
+
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    """Application entrypoint."""
     from craft_ls import server
 
-    print("Starting Craft-ls")
+    logger.info("Starting Craft-ls")
     server.start()
 
 

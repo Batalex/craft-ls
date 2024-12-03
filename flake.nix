@@ -32,7 +32,7 @@
       };
 
       devShells.default = pkgs.mkShell {
-        inputsFrom = [self.packages.${system}.default];
+        # inputsFrom = [self.packages.${system}.default];
         packages = with pkgs; [
           uv
           python312Packages.nox

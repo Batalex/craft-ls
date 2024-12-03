@@ -1,24 +1,97 @@
-from pygls import server
+"""Define the language server features."""
+
 from lsprotocol import types
+from pygls.server import LanguageServer
 
-craft_lserver = server.LanguageServer(name="craft-ls", version="0.1.0")
+server = LanguageServer(name="craft-ls", version="0.1.0")
+
+# TODO(prod): Remove this
+default_diag = types.Diagnostic(
+    message="Hello, world!",
+    severity=types.DiagnosticSeverity.Information,
+    range=types.Range(
+        start=types.Position(line=0, character=0),
+        end=types.Position(line=0, character=0),
+    ),
+)
 
 
-@craft_lserver.feature(types.TEXT_DOCUMENT_COMPLETION)
-def completions(params: types.CompletionParams):
+# TODO(prod): Bypass this feature
+@server.feature(types.TEXT_DOCUMENT_COMPLETION)
+def test_completions(params: types.CompletionParams):
+    """A simple completion feature to make sure the language server is running."""
     items = []
-    document = craft_lserver.workspace.get_text_document(params.text_document.uri)
+    document = server.workspace.get_text_document(params.text_document.uri)
     current_line = document.lines[params.position.line].strip()
     if current_line.endswith("hello."):
         items = [
             types.CompletionItem(label="world"),
-            types.CompletionItem(label="friend"),
+            types.CompletionItem(label="friendss"),
         ]
     return types.CompletionList(is_incomplete=False, items=items)
 
 
+@server.feature(types.TEXT_DOCUMENT_DID_OPEN)
+def did_open(params: types.DidOpenTextDocumentParams):
+    """Parse each document when it is opened"""
+    doc = server.workspace.get_text_document(params.text_document.uri)
+    # ls.parse(doc)
+    uri = params.text_document.uri
+    version = params.text_document.version
+    diagnostics = [default_diag]
+    server.publish_diagnostics(
+        uri=uri,
+        version=version,
+        diagnostics=diagnostics,
+    )
+
+
+@server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
+def did_change(params: types.DidOpenTextDocumentParams):
+    """Parse each document when it is changed"""
+    doc = server.workspace.get_text_document(params.text_document.uri)
+    # ls.parse(doc)
+
+
+# @server.feature(
+#     types.TEXT_DOCUMENT_DIAGNOSTIC,
+#     types.DiagnosticOptions(
+#         identifier="pull-diagnostics",
+#         inter_file_dependencies=False,
+#         workspace_diagnostics=True,
+#     ),
+# )
+# def document_diagnostic(params: types.DocumentDiagnosticParams):
+#     """Return diagnostics for the requested document"""
+#     # logging.info("%s", params)
+
+#     if (uri := params.text_document.uri) not in ls.diagnostics:
+#         return
+
+#     version, diagnostics = ls.diagnostics[uri]
+#     result_id = f"{uri}@{version}"
+
+#     if result_id == params.previous_result_id:
+#         return types.UnchangedDocumentDiagnosticReport(result_id)
+
+#     return types.FullDocumentDiagnosticReport(items=diagnostics, result_id=result_id)
+
+
+@server.feature(types.EXIT)
+def on_exit() -> None:
+    """Handle clean up on exit."""
+    server.shutdown()
+
+
+@server.feature(types.SHUTDOWN)
+def on_shutdown() -> None:
+    """Handle clean up on shutdown."""
+    server.shutdown()
+
+
 def start() -> None:
-    craft_lserver.start_io()
+    """Start the server."""
+    server.start_io()
 
 
 if __name__ == "__main__":
