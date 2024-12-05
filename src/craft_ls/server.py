@@ -1,19 +1,13 @@
 """Define the language server features."""
 
+from pathlib import Path
+
 from lsprotocol import types
 from pygls.server import LanguageServer
 
-server = LanguageServer(name="craft-ls", version="0.1.0")
+from craft_ls.core import get_diagnostics, validators
 
-# TODO(prod): Remove this
-default_diag = types.Diagnostic(
-    message="Hello, world!",
-    severity=types.DiagnosticSeverity.Information,
-    range=types.Range(
-        start=types.Position(line=0, character=0),
-        end=types.Position(line=0, character=0),
-    ),
-)
+server = LanguageServer(name="craft-ls", version="0.1.0")
 
 
 # TODO(prod): Bypass this feature
@@ -32,25 +26,57 @@ def test_completions(params: types.CompletionParams):
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
-def did_open(params: types.DidOpenTextDocumentParams):
-    """Parse each document when it is opened"""
+def on_opened(params: types.DidOpenTextDocumentParams):
+    """Parse each document when it is opened."""
     doc = server.workspace.get_text_document(params.text_document.uri)
-    # ls.parse(doc)
     uri = params.text_document.uri
     version = params.text_document.version
-    diagnostics = [default_diag]
-    server.publish_diagnostics(
-        uri=uri,
-        version=version,
-        diagnostics=diagnostics,
-    )
+
+    file_stem = Path(uri).stem
+    validator = validators.get(file_stem, None)
+    diagnostics = [
+        # TODO(prod): remove this diag
+        types.Diagnostic(
+            message=f"File type: {Path(uri).stem}\n",
+            severity=types.DiagnosticSeverity.Information,
+            range=types.Range(
+                start=types.Position(line=0, character=0),
+                end=types.Position(line=0, character=0),
+            ),
+        ),
+    ]
+    if validator := validators.get(file_stem, None):
+        diagnostics.extend(get_diagnostics(validator, doc.source))
+
+    if diagnostics:
+        server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
-def did_change(params: types.DidOpenTextDocumentParams):
-    """Parse each document when it is changed"""
+def on_changed(params: types.DidOpenTextDocumentParams):
+    """Parse each document when it is changed."""
     doc = server.workspace.get_text_document(params.text_document.uri)
-    # ls.parse(doc)
+    uri = params.text_document.uri
+    version = params.text_document.version
+
+    file_stem = Path(uri).stem
+    validator = validators.get(file_stem, None)
+    diagnostics = [
+        # TODO(prod): remove this diag
+        types.Diagnostic(
+            message=f"File type: {Path(uri).stem}\n",
+            severity=types.DiagnosticSeverity.Information,
+            range=types.Range(
+                start=types.Position(line=0, character=0),
+                end=types.Position(line=0, character=0),
+            ),
+        ),
+    ]
+    if validator := validators.get(file_stem, None):
+        diagnostics.extend(get_diagnostics(validator, doc.source))
+
+    if diagnostics:
+        server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
 
 # @server.feature(
@@ -78,13 +104,13 @@ def did_change(params: types.DidOpenTextDocumentParams):
 
 
 @server.feature(types.EXIT)
-def on_exit() -> None:
+def on_exit(*_) -> None:
     """Handle clean up on exit."""
     server.shutdown()
 
 
 @server.feature(types.SHUTDOWN)
-def on_shutdown() -> None:
+def on_shutdown(*_) -> None:
     """Handle clean up on shutdown."""
     server.shutdown()
 
