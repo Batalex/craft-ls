@@ -5,24 +5,27 @@ from pathlib import Path
 from lsprotocol import types
 from pygls.server import LanguageServer
 
+from craft_ls import __version__
 from craft_ls.core import get_diagnostics, validators
+from craft_ls.settings import IS_DEV_MODE
 
-server = LanguageServer(name="craft-ls", version="0.1.0")
+server = LanguageServer(name="craft-ls", version=__version__)
 
 
-# TODO(prod): Bypass this feature
-@server.feature(types.TEXT_DOCUMENT_COMPLETION)
-def test_completions(params: types.CompletionParams):
-    """A simple completion feature to make sure the language server is running."""
-    items = []
-    document = server.workspace.get_text_document(params.text_document.uri)
-    current_line = document.lines[params.position.line].strip()
-    if current_line.endswith("hello."):
-        items = [
-            types.CompletionItem(label="world"),
-            types.CompletionItem(label="friendss"),
-        ]
-    return types.CompletionList(is_incomplete=False, items=items)
+if IS_DEV_MODE:
+
+    @server.feature(types.TEXT_DOCUMENT_COMPLETION)
+    def test_completions(params: types.CompletionParams):
+        """A simple completion feature to make sure the language server is running."""
+        items = []
+        document = server.workspace.get_text_document(params.text_document.uri)
+        current_line = document.lines[params.position.line].strip()
+        if current_line.endswith("hello."):
+            items = [
+                types.CompletionItem(label="world"),
+                types.CompletionItem(label="friends"),
+            ]
+        return types.CompletionList(is_incomplete=False, items=items)
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
@@ -77,30 +80,6 @@ def on_changed(params: types.DidOpenTextDocumentParams):
 
     if diagnostics:
         server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
-
-
-# @server.feature(
-#     types.TEXT_DOCUMENT_DIAGNOSTIC,
-#     types.DiagnosticOptions(
-#         identifier="pull-diagnostics",
-#         inter_file_dependencies=False,
-#         workspace_diagnostics=True,
-#     ),
-# )
-# def document_diagnostic(params: types.DocumentDiagnosticParams):
-#     """Return diagnostics for the requested document"""
-#     # logging.info("%s", params)
-
-#     if (uri := params.text_document.uri) not in ls.diagnostics:
-#         return
-
-#     version, diagnostics = ls.diagnostics[uri]
-#     result_id = f"{uri}@{version}"
-
-#     if result_id == params.previous_result_id:
-#         return types.UnchangedDocumentDiagnosticReport(result_id)
-
-#     return types.FullDocumentDiagnosticReport(items=diagnostics, result_id=result_id)
 
 
 @server.feature(types.EXIT)
