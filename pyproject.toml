@@ -21,6 +21,10 @@ fmt = [
 lint = [
   "ruff >=0.8.0,<0.9.0",
 ]
+unit = [
+    "pytest>=8.3.4",
+    "pytest-lsp>=0.4.3",
+]
 
 [project.scripts]
 craft-ls = "craft_ls.__main__:main"

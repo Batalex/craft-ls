@@ -1,6 +1,12 @@
 # comment
+# another
 test: app
 parts:
   first: blip
+array:
+  - one
+  - two
+
+bli
 
 
