@@ -1,5 +1,13 @@
 # craft-ls
 
+
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/batalex/craft-ls/ci.yaml)
+
+Get on  
+[![PyPI - Version](https://img.shields.io/pypi/v/craft-ls)](https://pypi.org/project/craft-ls/)
+[![FlakeHub](https://img.shields.io/badge/FlakeHub-5277C3)](https://flakehub.com/flake/Batalex/craft-ls)
+
+
 `craft-ls` is a [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) implementation for *craft[^1] tools.
 
 `craft-ls` enables editors that support the LSP to get quality of life improvements while working on *craft configuration files.
@@ -24,7 +32,7 @@ pipx install craft-ls
 
 #### Helix
 
-```
+```toml
 # languages.toml
 [[language]]
 name = "yaml"
@@ -47,6 +55,7 @@ Project availability:
 
 Features:
 
+- Diagnostics
 - Autocompletion **on typing**
 - Symbol documentation
 
@@ -58,7 +67,7 @@ Ecosystem:
 
 TBD
 
-```
+```bash
 # .envrc
 use flake  # if you are using nix
 source .venv/bin/activate
