@@ -11,3 +11,5 @@ wheels/
 
 # Builds
 result
+requirements.txt
+*.snap

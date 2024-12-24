@@ -1,0 +1,26 @@
+name: craft-ls
+summary: A Language Server Protocol implementation for *craft files.
+description: |
+  craft-ls enables editors that support the LSP to get quality of life improvements while working on *craft configuration files.
+base: core24
+confinement: devmode
+adopt-info: craft-ls
+
+parts:
+  craft-ls:
+    plugin: python
+    source: .
+    build-snaps:
+      - astral-uv
+    override-build: |
+      uv export --format requirements-txt --no-dev -o requirements.txt
+      craftctl set version="$(cat src/craft_ls/__init__.py | cut -d '"' -f2 | xargs)"
+      craftctl default
+    stage-packages:
+      - python3-venv
+
+apps:
+  craft-ls:
+    command: bin/craft-ls
+    plugs:
+      - home
