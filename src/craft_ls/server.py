@@ -8,7 +8,11 @@ from pygls.server import LanguageServer
 from craft_ls import __version__
 from craft_ls.core import get_diagnostics, validators
 
-server = LanguageServer(name="craft-ls", version=__version__)
+server = LanguageServer(
+    name="craft-ls",
+    version=__version__,
+    text_document_sync_kind=types.TextDocumentSyncKind.Full,
+)
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
@@ -52,8 +56,7 @@ def on_changed(params: types.DidOpenTextDocumentParams):
     if validator := validators.get(file_stem, None):
         diagnostics.extend(get_diagnostics(validator, doc.source))
 
-    if diagnostics:
-        server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
+    server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
 
 @server.feature(types.TEXT_DOCUMENT_COMPLETION)
