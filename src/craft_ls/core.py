@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+from collections import deque
 from dataclasses import dataclass
 from importlib.resources import read_text
 from typing import Iterable
@@ -16,10 +17,18 @@ from yaml.events import (
     Event,
     MappingEndEvent,
     MappingStartEvent,
+    SequenceEndEvent,
+    SequenceStartEvent,
     StreamEndEvent,
 )
 from yaml.scanner import ScannerError
-from yaml.tokens import BlockEndToken, BlockMappingStartToken, ScalarToken, Token
+from yaml.tokens import (
+    BlockEndToken,
+    BlockMappingStartToken,
+    BlockSequenceStartToken,
+    ScalarToken,
+    Token,
+)
 
 validators: dict[str, Validator] = {}
 for file_type in ["snapcraft", "rockcraft"]:
@@ -74,23 +83,26 @@ def robust_load(instance_document: str) -> dict:
     """Parse the valid portion of the stream and construct a Python object."""
     events = []
     events_iter = yaml.parse(instance_document)
-    current_level = 0
+
+    closing_sequence: deque[Event] = deque()
 
     try:
         for event in events_iter:
             match event:
                 case MappingStartEvent():
-                    current_level += 1
+                    closing_sequence.append(MappingEndEvent())
+                case SequenceStartEvent():
+                    closing_sequence.append(SequenceEndEvent())
                 case MappingEndEvent():
-                    current_level -= 1
+                    closing_sequence.pop()
+                case SequenceEndEvent():
+                    closing_sequence.pop()
 
             events.append(event)
     except ScannerError:
-        pass
+        closing_sequence.extendleft([DocumentEndEvent(), StreamEndEvent()])
 
-    end_of_sequence: list[Event] = [MappingEndEvent()] * current_level
-    end_of_sequence.extend([DocumentEndEvent(), StreamEndEvent()])
-    truncated_file = yaml.emit(events + end_of_sequence)
+    truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
     return yaml.safe_load(truncated_file)
 
 
@@ -167,7 +179,7 @@ def get_faulty_token_range(tokens: list[Token], path_segments: Iterable) -> type
 
     for token in tokens:
         match token:
-            case BlockMappingStartToken():
+            case BlockMappingStartToken() | BlockSequenceStartToken():
                 current_level += 1
 
             case BlockEndToken():
