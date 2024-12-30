@@ -1,5 +1,6 @@
 """Define the language server features."""
 
+import os
 from pathlib import Path
 
 from lsprotocol import types
@@ -7,6 +8,8 @@ from pygls.server import LanguageServer
 
 from craft_ls import __version__
 from craft_ls.core import get_diagnostics, validators
+
+IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
 
 server = LanguageServer(
     name="craft-ls",
@@ -25,16 +28,20 @@ def on_opened(params: types.DidOpenTextDocumentParams) -> None:
 
     file_stem = Path(uri).stem
     validator = validators.get(file_stem, None)
-    diagnostics = [
-        types.Diagnostic(
-            message=f"Running craft-ls {__version__}.",
-            range=types.Range(
-                start=types.Position(line=0, character=0),
-                end=types.Position(line=0, character=0),
-            ),
-            severity=types.DiagnosticSeverity.Information,
-        )
-    ]
+    diagnostics = (
+        [
+            types.Diagnostic(
+                message=f"Running craft-ls {__version__}.",
+                range=types.Range(
+                    start=types.Position(line=0, character=0),
+                    end=types.Position(line=0, character=0),
+                ),
+                severity=types.DiagnosticSeverity.Information,
+            )
+        ]
+        if IS_DEV_MODE
+        else []
+    )
     if validator := validators.get(file_stem, None):
         diagnostics.extend(get_diagnostics(validator, source))
 
