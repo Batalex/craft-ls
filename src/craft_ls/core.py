@@ -9,7 +9,8 @@ from importlib.resources import read_text
 from typing import Any, Iterable, cast
 
 import yaml
-from jsonschema import ValidationError, Validator
+from jsonschema import ValidationError
+from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
 from lsprotocol import types
 from yaml.events import (
@@ -42,6 +43,7 @@ DEFAULT_RANGE = types.Range(
     start=types.Position(line=0, character=0),
     end=types.Position(line=0, character=0),
 )
+MISSING_DESC = "No description to display"
 
 
 @dataclass
@@ -214,3 +216,48 @@ def get_faulty_token_range(
             # TODO(array)
 
     return DEFAULT_RANGE
+
+
+def get_description_from_path(path: Iterable[str | int], schema: dict[str, Any]) -> str:
+    """Given an element path, get its description."""
+    sub = schema
+    for segment in path:
+        sub = sub.get("properties", {}).get(segment, {})
+
+    return str(sub.get("description", MISSING_DESC))
+
+
+def get_schema_path_from_token_position(
+    position: types.Position, instance_document: str
+) -> deque[str] | None:
+    """Parse the document to find the path to the current position."""
+    scanned_tokens = scan_for_tokens(instance_document)
+    current_path: deque[str] = deque()
+    last_scalar_token: str = ""
+    start_mark: yaml.Mark
+    end_mark: yaml.Mark
+
+    for token in scanned_tokens.tokens:
+        match token:
+            case BlockMappingStartToken() | BlockSequenceStartToken():
+                current_path.append(last_scalar_token)
+
+            case BlockEndToken():
+                current_path.pop()
+
+            case ScalarToken(value=value, start_mark=start_mark, end_mark=end_mark):
+                is_line_matching = start_mark.line == position.line
+                is_col_matching = (
+                    start_mark.column <= position.character <= end_mark.column
+                )
+                if is_line_matching and is_col_matching:
+                    current_path.append(value)
+                    current_path.remove("")
+                    return current_path
+
+                else:
+                    last_scalar_token = value
+
+            case _:
+                continue
+    return None
