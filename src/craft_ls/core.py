@@ -6,7 +6,7 @@ import re
 from collections import deque
 from dataclasses import dataclass
 from importlib.resources import read_text
-from typing import Iterable
+from typing import Any, Iterable, cast
 
 import yaml
 from jsonschema import ValidationError, Validator
@@ -79,7 +79,7 @@ def scan_for_tokens(instance_document: str) -> ScanResult:
     return CompleteScan(tokens=tokens)
 
 
-def robust_load(instance_document: str) -> dict:
+def robust_load(instance_document: str) -> dict[str, Any]:
     """Parse the valid portion of the stream and construct a Python object."""
     events = []
     events_iter = yaml.parse(instance_document)
@@ -103,7 +103,7 @@ def robust_load(instance_document: str) -> dict:
         closing_sequence.extendleft([DocumentEndEvent(), StreamEndEvent()])
 
     truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
-    return yaml.safe_load(truncated_file)
+    return cast(dict[str, Any], yaml.safe_load(truncated_file))
 
 
 def get_diagnostics(
@@ -168,8 +168,13 @@ def get_diagnostics(
     return diagnostics
 
 
-def get_faulty_token_range(tokens: list[Token], path_segments: Iterable) -> types.Range:
+def get_faulty_token_range(
+    tokens: list[Token], path_segments: Iterable[str | int]
+) -> types.Range:
     """Link the validation error to the position in the original document."""
+    target_level: int | None
+    segment: str | int | None
+
     path_iterator = iter(enumerate(path_segments))
     target_level, segment = next(path_iterator)
     # We keep track of the nested elements by incrementing/decrementing the level

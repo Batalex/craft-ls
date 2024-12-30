@@ -16,7 +16,7 @@ server = LanguageServer(
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
-def on_opened(params: types.DidOpenTextDocumentParams):
+def on_opened(params: types.DidOpenTextDocumentParams) -> None:
     """Parse each document when it is opened."""
     # doc = server.workspace.get_text_document(params.text_document.uri)
     uri = params.text_document.uri
@@ -43,7 +43,7 @@ def on_opened(params: types.DidOpenTextDocumentParams):
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
-def on_changed(params: types.DidOpenTextDocumentParams):
+def on_changed(params: types.DidOpenTextDocumentParams) -> None:
     """Parse each document when it is changed."""
     doc = server.workspace.get_text_document(params.text_document.uri)
     uri = params.text_document.uri
@@ -60,7 +60,9 @@ def on_changed(params: types.DidOpenTextDocumentParams):
 
 
 @server.feature(types.TEXT_DOCUMENT_COMPLETION)
-def completion(ls: LanguageServer, params: types.CompletionParams):
+def completion(
+    ls: LanguageServer, params: types.CompletionParams
+) -> list[types.CompletionItem]:
     """Placeholder."""
     return [
         types.CompletionItem(label="hello"),

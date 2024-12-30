@@ -32,11 +32,12 @@ def lint(session: nox.Session) -> None:
         "uv",
         "sync",
         "--frozen",
-        "--only-group",
+        "--group",
         "lint",
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
     session.run("ruff", "check", "--fix", "src")
+    session.run("mypy", "src")
 
 
 @nox.session()
