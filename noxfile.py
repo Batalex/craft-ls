@@ -37,6 +37,7 @@ def lint(session: nox.Session) -> None:
         env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
     session.run("ruff", "check", "--fix", "src")
+    session.run("ruff", "check", "--fix", "tests")
     session.run("mypy", "src")
 
 
