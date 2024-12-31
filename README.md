@@ -12,7 +12,13 @@ Get on\
 
 ## Features
 
-- Diagnostics
+| Feature              | Snapcraft | Rockcraft | Charmcraft |
+| :------------------- | :-------: | :-------: | :--------: |
+| Diagnostics          |    ✅     |    ✅     |     ❌     |
+| Symbol documentation |    ✅     |    ✅     |     ❌     |
+| Autocompletion       |    ❌     |    ❌     |     ❌     |
+
+https://github.com/user-attachments/assets/e4b831b5-dcac-4efd-aabb-d3040899b52b
 
 ## Usage
 
