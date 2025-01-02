@@ -1,4 +1,4 @@
-name: "Publish tags to FlakeHub"
+name: "Publish tags to FlakeHub and Snapstore"
 on:
   push:
     tags:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The existing tag to publish to FlakeHub"
+        description: "The existing tag to publish"
         type: "string"
         required: true
 jobs:
@@ -26,3 +26,16 @@ jobs:
           name: "Batalex/craft-ls"
           tag: "${{ inputs.tag }}"
           include-output-paths: true
+
+  snap-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: build
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: edge
