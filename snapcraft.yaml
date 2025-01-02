@@ -5,6 +5,7 @@ description: |
 base: core24
 confinement: strict
 adopt-info: craft-ls
+license:  BSD-3-Clause
 
 parts:
   craft-ls:
