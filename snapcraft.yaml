@@ -3,7 +3,7 @@ summary: A Language Server Protocol implementation for *craft files.
 description: |
   craft-ls enables editors that support the LSP to get quality of life improvements while working on *craft configuration files.
 base: core24
-confinement: devmode
+confinement: strict
 adopt-info: craft-ls
 
 parts:
