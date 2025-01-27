@@ -6,7 +6,7 @@ Get on\
 [![PyPI - Version](https://img.shields.io/pypi/v/craft-ls)](https://pypi.org/project/craft-ls/)
 [![FlakeHub](https://img.shields.io/badge/FlakeHub-5277C3)](https://flakehub.com/flake/Batalex/craft-ls)
 [![Snap - Version](https://img.shields.io/snapcraft/v/craft-ls/latest/edge)](https://snapcraft.io/craft-ls)
-
+[![VSCode Marketplace](https://vsmarketplacebadges.dev/version-short/abatisse.craft-ls.svg)](https://marketplace.visualstudio.com/items?itemName=abatisse.craft-ls)
 
 `craft-ls` is a [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) implementation for *craft[^1] tools.
 
