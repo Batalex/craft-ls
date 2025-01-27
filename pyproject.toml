@@ -87,3 +87,6 @@ known-first-party = ["craft_ls"]
 
 [tool.mypy]
 strict = true
+
+[tool.pyright]
+enableReachabilityAnalysis = false
