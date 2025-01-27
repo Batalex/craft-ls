@@ -20,14 +20,12 @@ IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
 server = LanguageServer(
     name="craft-ls",
     version=__version__,
-    text_document_sync_kind=types.TextDocumentSyncKind.Full,
 )
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
 def on_opened(params: types.DidOpenTextDocumentParams) -> None:
     """Parse each document when it is opened."""
-    # doc = server.workspace.get_text_document(params.text_document.uri)
     uri = params.text_document.uri
     version = params.text_document.version
     source = params.text_document.text

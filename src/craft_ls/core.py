@@ -31,6 +31,8 @@ from yaml.tokens import (
     Token,
 )
 
+SOURCE = "craft-ls"
+
 validators: dict[str, Validator] = {}
 for file_type in ["snapcraft", "rockcraft"]:
     schema = json.loads(read_text("craft_ls.schemas", f"{file_type}.json"))
@@ -138,6 +140,7 @@ def get_diagnostics(
                         message=f"{message}",
                         severity=types.DiagnosticSeverity.Error,
                         range=range_,
+                        source=SOURCE,
                     )
                 )
 
@@ -149,6 +152,7 @@ def get_diagnostics(
                         message=f"{message}",
                         severity=types.DiagnosticSeverity.Error,
                         range=range_,
+                        source=SOURCE,
                     )
                 )
 
@@ -160,6 +164,7 @@ def get_diagnostics(
                         message=f"{message}",
                         severity=types.DiagnosticSeverity.Error,
                         range=range_,
+                        source=SOURCE,
                     )
                 )
 
