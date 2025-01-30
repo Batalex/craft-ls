@@ -33,7 +33,6 @@ wheels = [
 
 [[package]]
 name = "craft-ls"
-version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
