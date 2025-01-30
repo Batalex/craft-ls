@@ -28,6 +28,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3 :: Only",
 ]
+license = "BSD-3-Clause"
 
 [project.urls]
 Repository = "https://github.com/batalex/craft-ls"
