@@ -6,6 +6,7 @@ import re
 from collections import deque
 from dataclasses import dataclass
 from importlib.resources import read_text
+from textwrap import shorten
 from typing import Any, Iterable, cast
 
 import yaml
@@ -46,6 +47,7 @@ DEFAULT_RANGE = types.Range(
     end=types.Position(line=0, character=0),
 )
 MISSING_DESC = "No description to display"
+SIZE = 79
 
 
 @dataclass
@@ -137,7 +139,7 @@ def get_diagnostics(
 
                 diagnostics.append(
                     types.Diagnostic(
-                        message=f"{message}",
+                        message=shorten(message, SIZE),
                         severity=types.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
@@ -149,7 +151,7 @@ def get_diagnostics(
 
                 diagnostics.append(
                     types.Diagnostic(
-                        message=f"{message}",
+                        message=shorten(message, SIZE),
                         severity=types.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
@@ -161,7 +163,18 @@ def get_diagnostics(
 
                 diagnostics.append(
                     types.Diagnostic(
-                        message=f"{message}",
+                        message=shorten(message, SIZE),
+                        severity=types.DiagnosticSeverity.Error,
+                        range=range_,
+                        source=SOURCE,
+                    )
+                )
+
+            case ValidationError(path=path, context=reasons) if reasons:
+                range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
+                diagnostics.append(
+                    types.Diagnostic(
+                        message=f"File is not valid, could be fixed by one of:\n- {'\n- '.join(shorten(reason.message, SIZE) for reason in reasons)}",
                         severity=types.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
