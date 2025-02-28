@@ -4,7 +4,6 @@ import json
 import logging
 import re
 from collections import deque
-from dataclasses import dataclass
 from importlib.resources import read_text
 from textwrap import shorten
 from typing import Any, Iterable, cast
@@ -13,7 +12,7 @@ import yaml
 from jsonschema import ValidationError
 from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
-from lsprotocol import types
+from lsprotocol import types as lsp
 from yaml.events import (
     DocumentEndEvent,
     Event,
@@ -32,6 +31,8 @@ from yaml.tokens import (
     Token,
 )
 
+from craft_ls.types import CompleteScan, IncompleteScan, ScanResult
+
 SOURCE = "craft-ls"
 
 validators: dict[str, Validator] = {}
@@ -42,33 +43,12 @@ for file_type in ["snapcraft", "rockcraft"]:
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_RANGE = types.Range(
-    start=types.Position(line=0, character=0),
-    end=types.Position(line=0, character=0),
+DEFAULT_RANGE = lsp.Range(
+    start=lsp.Position(line=0, character=0),
+    end=lsp.Position(line=0, character=0),
 )
 MISSING_DESC = "No description to display"
 SIZE = 79
-
-
-@dataclass
-class ScanResult:
-    """Token scan result container."""
-
-    tokens: list[Token]
-
-
-@dataclass
-class CompleteScan(ScanResult):
-    """Indicate a complete scan of the document."""
-
-    pass
-
-
-@dataclass
-class IncompleteScan(ScanResult):
-    """Indicate an incomplete scan of the document."""
-
-    pass
 
 
 def scan_for_tokens(instance_document: str) -> ScanResult:
@@ -114,7 +94,7 @@ def robust_load(instance_document: str) -> dict[str, Any]:
 
 def get_diagnostics(
     validator: Validator, instance_document: str
-) -> list[types.Diagnostic]:
+) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
     instance = {}
     match scanned_tokens := scan_for_tokens(instance_document):
@@ -138,9 +118,9 @@ def get_diagnostics(
                     range_ = get_faulty_token_range(tokens, list(path) + [key])
 
                 diagnostics.append(
-                    types.Diagnostic(
+                    lsp.Diagnostic(
                         message=shorten(message, SIZE),
-                        severity=types.DiagnosticSeverity.Error,
+                        severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
                     )
@@ -150,9 +130,9 @@ def get_diagnostics(
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
 
                 diagnostics.append(
-                    types.Diagnostic(
+                    lsp.Diagnostic(
                         message=shorten(message, SIZE),
-                        severity=types.DiagnosticSeverity.Error,
+                        severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
                     )
@@ -162,9 +142,9 @@ def get_diagnostics(
                 range_ = get_faulty_token_range(tokens, path)
 
                 diagnostics.append(
-                    types.Diagnostic(
+                    lsp.Diagnostic(
                         message=shorten(message, SIZE),
-                        severity=types.DiagnosticSeverity.Error,
+                        severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
                     )
@@ -173,9 +153,9 @@ def get_diagnostics(
             case ValidationError(path=path, context=reasons) if reasons:
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
                 diagnostics.append(
-                    types.Diagnostic(
+                    lsp.Diagnostic(
                         message=f"File is not valid, could be fixed by one of:\n- {'\n- '.join(shorten(reason.message, SIZE) for reason in reasons)}",
-                        severity=types.DiagnosticSeverity.Error,
+                        severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
                     )
@@ -190,7 +170,7 @@ def get_diagnostics(
 
 def get_faulty_token_range(
     tokens: list[Token], path_segments: Iterable[str | int]
-) -> types.Range:
+) -> lsp.Range:
     """Link the validation error to the position in the original document."""
     target_level: int | None
     segment: str | int | None
@@ -220,12 +200,12 @@ def get_faulty_token_range(
 
                 else:  # found our culprit
                     # TODO(ux): flag the next token/block?
-                    range = types.Range(
-                        start=types.Position(
+                    range = lsp.Range(
+                        start=lsp.Position(
                             line=token.start_mark.line,
                             character=token.start_mark.column,
                         ),
-                        end=types.Position(
+                        end=lsp.Position(
                             line=token.end_mark.line, character=token.end_mark.column
                         ),
                     )
@@ -246,7 +226,7 @@ def get_description_from_path(path: Iterable[str | int], schema: dict[str, Any])
 
 
 def get_schema_path_from_token_position(
-    position: types.Position, instance_document: str
+    position: lsp.Position, instance_document: str
 ) -> deque[str] | None:
     """Parse the document to find the path to the current position."""
     scanned_tokens = scan_for_tokens(instance_document)
