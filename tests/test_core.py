@@ -1,7 +1,9 @@
 import json
 from collections import deque
 
-from lsprotocol.types import Position
+from hypothesis import assume, example, given
+from hypothesis import strategies as st
+from lsprotocol import types as lsp
 
 from craft_ls.core import (
     MISSING_DESC,
@@ -59,6 +61,7 @@ price:
 
 
 def test_get_description_first_level_ok() -> None:
+    """Assert that we can get the description from the schema of a first-level key."""
     # Given
     item_path = ["price"]
 
@@ -70,6 +73,7 @@ def test_get_description_first_level_ok() -> None:
 
 
 def test_get_description_nested_ok() -> None:
+    """Assert that we can get the description from the schema of a non first-level key."""
     # Given
     item_path = ["price", "currency"]
 
@@ -80,9 +84,13 @@ def test_get_description_nested_ok() -> None:
     assert description == "The price currency"
 
 
-def test_get_description_unknown_path() -> None:
+@given(key=st.text())
+@example("something_not_present")
+def test_get_description_unknown_path(key: str) -> None:
+    """Assert that we get a default message if the key is not in the schema."""
     # Given
-    item_path = ["price", "something_not_present"]
+    assume(key not in {"amount", "currency"})  # exclude the two counter examples
+    item_path = ["price", key]
 
     # When
     description = get_description_from_path(item_path, schema)
@@ -94,7 +102,7 @@ def test_get_description_unknown_path() -> None:
 def test_get_path_from_position_first_level_ok() -> None:
     # Given
     # line is 2 because of initial newline after """ + comment in the document
-    position = Position(2, 5)
+    position = lsp.Position(2, 5)
 
     # When
     path = get_schema_path_from_token_position(position, document)
@@ -105,7 +113,7 @@ def test_get_path_from_position_first_level_ok() -> None:
 
 def test_get_path_from_position_nested_ok() -> None:
     # Given
-    position = Position(5, 5)
+    position = lsp.Position(5, 5)
 
     # When
     path = get_schema_path_from_token_position(position, document)
@@ -116,7 +124,7 @@ def test_get_path_from_position_nested_ok() -> None:
 
 def test_get_path_from_comment_ko() -> None:
     # Given
-    position = Position(1, 5)  # comment line
+    position = lsp.Position(1, 5)  # comment line
 
     # When
     path = get_schema_path_from_token_position(position, document)
@@ -127,7 +135,7 @@ def test_get_path_from_comment_ko() -> None:
 
 def test_get_path_from_empty_space_ko() -> None:
     # Given
-    position = Position(4, 10)  # to the right of "price"
+    position = lsp.Position(4, 10)  # to the right of "price"
 
     # When
     path = get_schema_path_from_token_position(position, document)

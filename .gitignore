@@ -13,3 +13,6 @@ wheels/
 result
 requirements.txt
 *.snap
+
+# Misc
+.hypothesis

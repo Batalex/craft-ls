@@ -45,6 +45,7 @@ lint = [
   "types-jsonschema",
 ]
 unit = [
+  "hypothesis>=6.127.3",
   "pytest>=8.3.4",
   "pytest-lsp>=0.4.3",
 ]
@@ -90,4 +91,8 @@ known-first-party = ["craft_ls"]
 strict = true
 
 [tool.pyright]
-enableReachabilityAnalysis = false
+enableReachabilityAnalysis = false  # unreliable
+
+[tool.pytest.ini_options]
+log_cli_level = "INFO"
+asyncio_mode = "auto"
