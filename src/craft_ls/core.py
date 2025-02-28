@@ -6,7 +6,7 @@ import re
 from collections import deque
 from importlib.resources import files
 from textwrap import shorten
-from typing import Any, Iterable, cast
+from typing import Iterable, cast
 
 import yaml
 from jsonschema import ValidationError
@@ -31,26 +31,31 @@ from yaml.tokens import (
     Token,
 )
 
-from craft_ls.types import CompleteScan, IncompleteScan, ScanResult
+from craft_ls.types import (
+    CompleteScan,
+    IncompleteScan,
+    ScanResult,
+    Schema,
+    YamlDocument,
+)
 
 SOURCE = "craft-ls"
-
-validators: dict[str, Validator] = {}
-for file_type in ["snapcraft", "rockcraft"]:
-    schema = json.loads(
-        files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
-    )
-    validators[file_type] = validator_for(schema)(schema)
-
-logger = logging.getLogger(__name__)
-
-
+FILE_TYPES = ["snapcraft", "rockcraft"]
+MISSING_DESC = "No description to display"
+SIZE = 79
 DEFAULT_RANGE = lsp.Range(
     start=lsp.Position(line=0, character=0),
     end=lsp.Position(line=0, character=0),
 )
-MISSING_DESC = "No description to display"
-SIZE = 79
+
+logger = logging.getLogger(__name__)
+
+validators: dict[str, Validator] = {}
+for file_type in FILE_TYPES:
+    schema = json.loads(
+        files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
+    )
+    validators[file_type] = validator_for(schema)(schema)
 
 
 def scan_for_tokens(instance_document: str) -> ScanResult:
@@ -62,12 +67,14 @@ def scan_for_tokens(instance_document: str) -> ScanResult:
         for event in tokens_iter:
             tokens.append(event)
     except ScannerError:
-        return IncompleteScan(tokens=tokens)
+        instance = robust_load(instance_document)
+        return IncompleteScan(tokens=tokens, instance=instance)
 
-    return CompleteScan(tokens=tokens)
+    instance = cast(YamlDocument, yaml.safe_load(instance_document))
+    return CompleteScan(tokens=tokens, instance=instance)
 
 
-def robust_load(instance_document: str) -> dict[str, Any]:
+def robust_load(instance_document: str) -> YamlDocument:
     """Parse the valid portion of the stream and construct a Python object."""
     events = []
     events_iter = yaml.parse(instance_document)
@@ -91,25 +98,18 @@ def robust_load(instance_document: str) -> dict[str, Any]:
         closing_sequence.extendleft([DocumentEndEvent(), StreamEndEvent()])
 
     truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
-    return cast(dict[str, Any], yaml.safe_load(truncated_file))
+    return cast(YamlDocument, yaml.safe_load(truncated_file))
 
 
 def get_diagnostics(
     validator: Validator, instance_document: str
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
-    instance = {}
-    match scanned_tokens := scan_for_tokens(instance_document):
-        case CompleteScan():
-            instance = yaml.safe_load(instance_document)
-
-        case IncompleteScan():
-            instance = robust_load(instance_document)
-
+    scanned_tokens = scan_for_tokens(instance_document)
     tokens = list(scanned_tokens.tokens)
     diagnostics = []
 
-    for error in validator.iter_errors(instance):
+    for error in validator.iter_errors(scanned_tokens.instance):
         match error:
             case ValidationError(
                 validator="additionalProperties", path=path, message=message
@@ -218,7 +218,7 @@ def get_faulty_token_range(
     return DEFAULT_RANGE
 
 
-def get_description_from_path(path: Iterable[str | int], schema: dict[str, Any]) -> str:
+def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
     """Given an element path, get its description."""
     sub = schema
     for segment in path:

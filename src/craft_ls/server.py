@@ -2,9 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
-from lsprotocol import types
+from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
 from craft_ls import __version__
@@ -14,6 +14,7 @@ from craft_ls.core import (
     get_schema_path_from_token_position,
     validators,
 )
+from craft_ls.types import Schema
 
 IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
 
@@ -23,8 +24,8 @@ server = LanguageServer(
 )
 
 
-@server.feature(types.TEXT_DOCUMENT_DID_OPEN)
-def on_opened(params: types.DidOpenTextDocumentParams) -> None:
+@server.feature(lsp.TEXT_DOCUMENT_DID_OPEN)
+def on_opened(params: lsp.DidOpenTextDocumentParams) -> None:
     """Parse each document when it is opened."""
     uri = params.text_document.uri
     version = params.text_document.version
@@ -34,13 +35,13 @@ def on_opened(params: types.DidOpenTextDocumentParams) -> None:
     validator = validators.get(file_stem, None)
     diagnostics = (
         [
-            types.Diagnostic(
+            lsp.Diagnostic(
                 message=f"Running craft-ls {__version__}.",
-                range=types.Range(
-                    start=types.Position(line=0, character=0),
-                    end=types.Position(line=0, character=0),
+                range=lsp.Range(
+                    start=lsp.Position(line=0, character=0),
+                    end=lsp.Position(line=0, character=0),
                 ),
-                severity=types.DiagnosticSeverity.Information,
+                severity=lsp.DiagnosticSeverity.Information,
             )
         ]
         if IS_DEV_MODE
@@ -53,8 +54,8 @@ def on_opened(params: types.DidOpenTextDocumentParams) -> None:
         server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
 
-@server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
-def on_changed(params: types.DidOpenTextDocumentParams) -> None:
+@server.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)
+def on_changed(params: lsp.DidOpenTextDocumentParams) -> None:
     """Parse each document when it is changed."""
     doc = server.workspace.get_text_document(params.text_document.uri)
     uri = params.text_document.uri
@@ -70,8 +71,8 @@ def on_changed(params: types.DidOpenTextDocumentParams) -> None:
     server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
 
-@server.feature(types.TEXT_DOCUMENT_HOVER)
-def hover(ls: LanguageServer, params: types.HoverParams) -> types.Hover | None:
+@server.feature(lsp.TEXT_DOCUMENT_HOVER)
+def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     """Get item description on hover."""
     pos = params.position
     uri = params.text_document.uri
@@ -90,16 +91,16 @@ def hover(ls: LanguageServer, params: types.HoverParams) -> types.Hover | None:
         return None
 
     description = get_description_from_path(
-        path=path, schema=cast(dict[str, Any], validator.schema)
+        path=path, schema=cast(Schema, validator.schema)
     )
-    return types.Hover(
-        contents=types.MarkupContent(
-            kind=types.MarkupKind.Markdown,
+    return lsp.Hover(
+        contents=lsp.MarkupContent(
+            kind=lsp.MarkupKind.Markdown,
             value=description,
         ),
-        range=types.Range(
-            start=types.Position(line=pos.line, character=0),
-            end=types.Position(line=pos.line + 1, character=0),
+        range=lsp.Range(
+            start=lsp.Position(line=pos.line, character=0),
+            end=lsp.Position(line=pos.line + 1, character=0),
         ),
     )
 
