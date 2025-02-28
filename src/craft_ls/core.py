@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from collections import deque
-from importlib.resources import read_text
+from importlib.resources import files
 from textwrap import shorten
 from typing import Any, Iterable, cast
 
@@ -37,7 +37,9 @@ SOURCE = "craft-ls"
 
 validators: dict[str, Validator] = {}
 for file_type in ["snapcraft", "rockcraft"]:
-    schema = json.loads(read_text("craft_ls.schemas", f"{file_type}.json"))
+    schema = json.loads(
+        files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
+    )
     validators[file_type] = validator_for(schema)(schema)
 
 logger = logging.getLogger(__name__)
