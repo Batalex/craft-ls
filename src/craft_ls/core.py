@@ -40,7 +40,7 @@ from craft_ls.types import (
 )
 
 SOURCE = "craft-ls"
-FILE_TYPES = ["snapcraft", "rockcraft"]
+FILE_TYPES = ["snapcraft", "rockcraft", "charmcraft"]
 MISSING_DESC = "No description to display"
 SIZE = 79
 DEFAULT_RANGE = lsp.Range(
