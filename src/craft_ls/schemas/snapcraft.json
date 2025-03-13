@@ -1206,14 +1206,17 @@
             {
               "required": [
                 "type"
-              ]
+              ],
+              "err_msg": "Missing build information 'type' or 'base'"
             },
             {
               "not": {
                 "required": [
                   "base"
                 ]
-              }
+              },
+              "err_msg": "type: <base|kernel|snapd> must omit 'base'",
+              "err_path": ["base"]
             }
           ]
         },

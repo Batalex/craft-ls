@@ -156,10 +156,22 @@ def get_diagnostics(
                 )
 
             case ValidationError(path=path, context=reasons) if reasons:
+                best_match_error = best_match(reasons)
+
+                # The sub-error might have a path we should highlight
+                if not path and (
+                    best_match_path := best_match_error.schema.get("err_path", [])
+                ):
+                    path = best_match_path
+
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
+                message = best_match_error.schema.get(
+                    "err_msg", best_match_error.message
+                )
+
                 diagnostics.append(
                     lsp.Diagnostic(
-                        message=f"File is not valid, could be fixed by one of:\n- {'\n- '.join(shorten(reason.message, SIZE) for reason in reasons)}",
+                        message=shorten(message, SIZE),
                         severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
@@ -216,7 +228,7 @@ def get_faulty_token_range(
                     continue
 
                 else:  # found our culprit
-                    # TODO(ux): flag the next token/block?
+                    # TODO(ux): flag up to the next token/block?
                     range = lsp.Range(
                         start=lsp.Position(
                             line=token.start_mark.line,
