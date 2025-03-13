@@ -1,5 +1,6 @@
 import json
 from collections import deque
+from textwrap import dedent
 
 from hypothesis import assume, example, given
 from hypothesis import strategies as st
@@ -8,7 +9,9 @@ from lsprotocol import types as lsp
 from craft_ls.core import (
     MISSING_DESC,
     get_description_from_path,
+    get_faulty_token_range,
     get_schema_path_from_token_position,
+    scan_for_tokens,
 )
 
 # Adapted from json-schema.org
@@ -52,7 +55,7 @@ schema = json.loads(
 
 document = """
 # Some comment
-productId: foo
+productId: 001
 productName: bar
 price:
   amount: 50
@@ -142,3 +145,27 @@ def test_get_path_from_empty_space_ko() -> None:
 
     # Then
     assert not path
+
+
+def test_values_are_not_flagged() -> None:
+    """Check that we flag the correct token: a key, not a value."""
+    # Given
+    # With the following document, an error on "productName" should
+    # be matched with the third line, not the second one
+    document = dedent(
+        """
+        # Some comment
+        productId: productName
+        productName: InvalidValue
+        price:
+          amount: 50
+          currency: 10
+        """
+    )
+    scan = scan_for_tokens(document)
+
+    # When
+    range_ = get_faulty_token_range(scan.tokens, ["productName"])
+
+    # Then
+    assert range_.start.line == 3

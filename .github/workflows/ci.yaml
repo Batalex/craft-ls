@@ -54,5 +54,5 @@ jobs:
       - name: Install nox
         run: uv tool install nox
 
-      - name: Run linter
+      - name: Run tests
         run: nox -s tests

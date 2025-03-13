@@ -5,11 +5,13 @@ import logging
 import re
 from collections import deque
 from importlib.resources import files
+from itertools import tee
 from textwrap import shorten
 from typing import Iterable, cast
 
 import yaml
 from jsonschema import ValidationError
+from jsonschema.exceptions import best_match
 from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
@@ -29,9 +31,10 @@ from yaml.tokens import (
     BlockSequenceStartToken,
     ScalarToken,
     Token,
+    ValueToken,
 )
 
-from craft_ls.types import (
+from craft_ls.types_ import (
     CompleteScan,
     IncompleteScan,
     ScanResult,
@@ -153,10 +156,22 @@ def get_diagnostics(
                 )
 
             case ValidationError(path=path, context=reasons) if reasons:
+                best_match_error = best_match(reasons)
+
+                # The sub-error might have a path we should highlight
+                if not path and (
+                    best_match_path := best_match_error.schema.get("err_path", [])
+                ):
+                    path = best_match_path
+
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
+                message = best_match_error.schema.get(
+                    "err_msg", best_match_error.message
+                )
+
                 diagnostics.append(
                     lsp.Diagnostic(
-                        message=f"File is not valid, could be fixed by one of:\n- {'\n- '.join(shorten(reason.message, SIZE) for reason in reasons)}",
+                        message=shorten(message, SIZE),
                         severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
@@ -168,6 +183,12 @@ def get_diagnostics(
                 logger.debug(error.message)
 
     return diagnostics
+
+
+def peek(tee_iterator: Iterable[Token]) -> Token | None:
+    """Return the next value without moving the input forward."""
+    [forked_iterator] = tee(tee_iterator, 1)
+    return next(forked_iterator, None)
 
 
 def get_faulty_token_range(
@@ -184,7 +205,10 @@ def get_faulty_token_range(
     # counts as a mapping, hence the -1 offset
     current_level = -1
 
-    for token in tokens:
+    # Create a peekable iterator
+    [token_iterator] = tee(tokens, 1)
+
+    for token in token_iterator:
         match token:
             case BlockMappingStartToken() | BlockSequenceStartToken():
                 current_level += 1
@@ -193,7 +217,10 @@ def get_faulty_token_range(
                 current_level -= 1
 
             case ScalarToken(value=value) if value == segment:
-                if current_level != target_level:
+                nested_level_mismatch = current_level != target_level
+                is_not_key = not isinstance(peek(token_iterator), ValueToken)
+
+                if nested_level_mismatch or is_not_key:
                     continue
 
                 target_level, segment = next(path_iterator, (None, None))
@@ -201,7 +228,7 @@ def get_faulty_token_range(
                     continue
 
                 else:  # found our culprit
-                    # TODO(ux): flag the next token/block?
+                    # TODO(ux): flag up to the next token/block?
                     range = lsp.Range(
                         start=lsp.Position(
                             line=token.start_mark.line,

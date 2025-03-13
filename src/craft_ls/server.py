@@ -14,7 +14,7 @@ from craft_ls.core import (
     get_schema_path_from_token_position,
     validators,
 )
-from craft_ls.types import Schema
+from craft_ls.types_ import Schema
 
 IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
 
