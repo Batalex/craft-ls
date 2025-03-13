@@ -34,7 +34,7 @@ from yaml.tokens import (
     ValueToken,
 )
 
-from craft_ls.types import (
+from craft_ls.types_ import (
     CompleteScan,
     IncompleteScan,
     ScanResult,
