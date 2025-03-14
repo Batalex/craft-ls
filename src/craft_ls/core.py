@@ -113,23 +113,33 @@ def get_diagnostics(
     diagnostics = []
 
     for error in validator.iter_errors(scanned_tokens.instance):
+        if error.context:
+            error = cast(ValidationError, best_match(error.context))
+
         match error:
             case ValidationError(
                 validator="additionalProperties", path=path, message=message
             ):
-                range_ = DEFAULT_RANGE
-                pattern = r"\('(?P<key>.*)' was unexpected\)"
-                if key := re.search(pattern, message).group("key"):
-                    range_ = get_faulty_token_range(tokens, list(path) + [key])
+                ranges = [DEFAULT_RANGE]
+                pattern = r"\((?P<keys>.*) (was|were) unexpected\)"
+                if (match := re.search(pattern, message or "")) and (
+                    keys := match.group("keys")
+                ):
+                    keys_cleaned = [key.strip(" '") for key in keys.split(",")]
+                    ranges = [
+                        get_faulty_token_range(tokens, list(path) + [key])
+                        for key in keys_cleaned
+                    ]
 
-                diagnostics.append(
-                    lsp.Diagnostic(
-                        message=shorten(message, SIZE),
-                        severity=lsp.DiagnosticSeverity.Error,
-                        range=range_,
-                        source=SOURCE,
+                for range_ in ranges:
+                    diagnostics.append(
+                        lsp.Diagnostic(
+                            message=shorten(message, SIZE),
+                            severity=lsp.DiagnosticSeverity.Error,
+                            range=range_,
+                            source=SOURCE,
+                        )
                     )
-                )
 
             case ValidationError(validator="required", path=path, message=message):
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
@@ -143,31 +153,12 @@ def get_diagnostics(
                     )
                 )
 
-            case ValidationError(path=path, message=message) if path:
-                range_ = get_faulty_token_range(tokens, path)
-
-                diagnostics.append(
-                    lsp.Diagnostic(
-                        message=shorten(message, SIZE),
-                        severity=lsp.DiagnosticSeverity.Error,
-                        range=range_,
-                        source=SOURCE,
-                    )
-                )
-
-            case ValidationError(path=path, context=reasons) if reasons:
-                best_match_error = best_match(reasons)
-
+            case ValidationError(path=path, message=str(message), schema={**schema}):
                 # The sub-error might have a path we should highlight
-                if not path and (
-                    best_match_path := best_match_error.schema.get("err_path", [])
-                ):
-                    path = best_match_path
-
+                path = deque(cast(Iterable[str], schema.get("err_path", path)))
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
-                message = best_match_error.schema.get(
-                    "err_msg", best_match_error.message
-                )
+                message = str(schema.get("err_msg", message))
+                range_ = get_faulty_token_range(tokens, path)
 
                 diagnostics.append(
                     lsp.Diagnostic(

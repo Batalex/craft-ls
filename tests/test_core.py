@@ -4,11 +4,13 @@ from textwrap import dedent
 
 from hypothesis import assume, example, given
 from hypothesis import strategies as st
+from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
 
 from craft_ls.core import (
     MISSING_DESC,
     get_description_from_path,
+    get_diagnostics,
     get_faulty_token_range,
     get_schema_path_from_token_position,
     scan_for_tokens,
@@ -48,10 +50,12 @@ schema = json.loads(
       }
     }
   },
-  "required": ["productId", "productName", "price"]
+  "required": ["productId", "productName", "price"],
+  "additionalProperties": false
 }
 """
 )
+validator = validator_for(schema)(schema)
 
 document = """
 # Some comment
@@ -159,7 +163,7 @@ def test_values_are_not_flagged() -> None:
         productName: InvalidValue
         price:
           amount: 50
-          currency: 10
+          currency: euro
         """
     )
     scan = scan_for_tokens(document)
@@ -169,3 +173,27 @@ def test_values_are_not_flagged() -> None:
 
     # Then
     assert range_.start.line == 3
+
+
+def test_multiple_unexpected_keys() -> None:
+    # Given
+    # With the following document, we expect two diagnostics
+    document = dedent(
+        """
+        # Some comment
+        productId: 001
+        productName: name
+        price:
+          amount: 50
+          currency: euro
+        foo: bar
+        baz: buz
+        """
+    )
+
+    # When
+    diagnostics = get_diagnostics(validator, document)
+
+    # Then
+    assert len(diagnostics) == 2
+    assert all("unexpected" in diag.message for diag in diagnostics)
