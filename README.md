@@ -14,11 +14,11 @@ Get on\
 
 ## Features
 
-| Feature              | Snapcraft | Rockcraft | Charmcraft |
-| :------------------- | :-------: | :-------: | :--------: |
-| Diagnostics          |    ✅     |    ✅     |     ❌     |
-| Symbol documentation |    ✅     |    ✅     |     ❌     |
-| Autocompletion       |    ❌     |    ❌     |     ❌     |
+| Feature              | Snapcraft | Rockcraft | Charmcraft[^1] |
+| :------------------- | :-------: | :-------: | :------------: |
+| Diagnostics          |    ✅     |    ✅     |       ✅       |
+| Symbol documentation |    ✅     |    ✅     |       ❌       |
+| Autocompletion       |    ❌     |    ❌     |       ❌       |
 
 https://github.com/user-attachments/assets/e4b831b5-dcac-4efd-aabb-d3040899b52b
 
@@ -48,7 +48,19 @@ language-servers = ["craft-ls"]
 command = "craft-ls"
 ```
 
-TBD: neovim, VSCode
+#### VSCode
+
+The VSCode extension can be installed from the marketplace.
+It requires a Python 3.12 interpreter.
+If not automatically picked, you may configure it using the following key:
+
+```json
+"craft-ls.interpreter": [
+  "/usr/bin/python3.12"
+]
+```
+
+TBD: neovim
 
 ## Roadmap
 
@@ -69,4 +81,4 @@ Ecosystem:
 
 - Encourage *craft tools to refine their JSONSchemas even further
 
-[^1]: only snapcraft and rockcraft so far
+[^1]: snapcraft, rockcraft and partial support for charmcraft (all-in-one `charmcraft.yaml` only)
