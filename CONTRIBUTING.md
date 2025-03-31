@@ -151,3 +151,17 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/en/
 ## Attribution
 
 This guide is based on the [contributing.md](https://contributing.md/generator)!
+
+## New release check list/procedure
+
+- Version bumped in `src/craft_ls/__init__.py`
+- Version bumped to the same version in `flake.nix`
+- Merge to main; do not create release tag
+- Run manual workflow "Publish". It takes care of building the package, creating the release tag and uploading to PyPI.
+- Run manual workflow "Publish tags" to create new snap and flake revisions.
+
+For VSCode extension:
+- Sync dependencies to get the latest `craft-ls`
+- Update version in `package.json`
+- Create tag
+- Run manual workflow "Release" using the tag
