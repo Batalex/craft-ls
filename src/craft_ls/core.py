@@ -141,8 +141,11 @@ def get_diagnostics(
                         )
                     )
 
-            case ValidationError(validator="required", path=path, message=message):
+            case ValidationError(
+                validator="required", path=path, message=message, schema={**schema}
+            ):
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
+                message = str(schema.get("err_msg", message))
 
                 diagnostics.append(
                     lsp.Diagnostic(
