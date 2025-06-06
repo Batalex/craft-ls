@@ -101,7 +101,7 @@ def build_schemas(session=nox.Session) -> None:
         (charm := tmp_build / "charmcraft_upstream.json").open(
             "w", encoding="utf-8"
         ) as f,
-        urlopen(ROCKCRAFT_URL) as g,
+        urlopen(CHARMCRAFT_URL) as g,
     ):
         f.write(g.read().decode("utf-8"))
 
