@@ -17,7 +17,7 @@
     in {
       packages.default = pythonPkgs.buildPythonPackage {
         pname = "craft-ls";
-        version = "0.3.1";
+        version = "0.3.2";
         format = "pyproject";
         src = ./.;
         build-system = [pythonPkgs.hatchling];
@@ -28,6 +28,8 @@
           lsprotocol
           jsonschema
           pyyaml
+          jsonref
+          referencing
         ];
       };
 
