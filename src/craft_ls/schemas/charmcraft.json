@@ -1,4 +1,5 @@
 {
+	"$id": "#charmcraft",
 	"$defs": {
 		"AnalysisConfig": {
 			"additionalProperties": false,
@@ -852,6 +853,7 @@
 			"type": "object"
 		},
 		"PlatformCharm": {
+			"$id": "urn:charmcraft:platformcharm",
 			"additionalProperties": false,
 			"description": "Model for defining a charm using Platforms.",
 			"properties": {

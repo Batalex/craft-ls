@@ -1,0 +1,16 @@
+--- src/craft_ls/schemas/charmcraft.json	2025-06-20 12:01:51.058543923 +0200
++++ charmcraft.json	2025-06-20 12:01:48.078478950 +0200
+@@ -1,4 +1,5 @@
+ {
++	"$id": "#charmcraft",
+ 	"$defs": {
+ 		"AnalysisConfig": {
+ 			"additionalProperties": false,
+@@ -852,6 +853,7 @@
+ 			"type": "object"
+ 		},
+ 		"PlatformCharm": {
++			"$id": "urn:charmcraft:platformcharm",
+ 			"additionalProperties": false,
+ 			"description": "Model for defining a charm using Platforms.",
+ 			"properties": {
