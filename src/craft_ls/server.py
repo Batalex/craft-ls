@@ -1,5 +1,6 @@
 """Define the language server features."""
 
+import logging
 import os
 from pathlib import Path
 from typing import cast
@@ -12,12 +13,13 @@ from craft_ls.core import (
     get_description_from_path,
     get_diagnostics,
     get_schema_path_from_token_position,
-    validators,
+    get_validator_and_scan,
 )
-from craft_ls.types_ import Schema
+from craft_ls.types_ import IncompleteScan, Schema
 
 IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
 
+logger = logging.getLogger(__name__)
 server = LanguageServer(
     name="craft-ls",
     version=__version__,
@@ -32,7 +34,6 @@ def on_opened(params: lsp.DidOpenTextDocumentParams) -> None:
     source = params.text_document.text
 
     file_stem = Path(uri).stem
-    validator = validators.get(file_stem, None)
     diagnostics = (
         [
             lsp.Diagnostic(
@@ -47,8 +48,26 @@ def on_opened(params: lsp.DidOpenTextDocumentParams) -> None:
         if IS_DEV_MODE
         else []
     )
-    if validator := validators.get(file_stem, None):
-        diagnostics.extend(get_diagnostics(validator, source))
+
+    match get_validator_and_scan(file_stem, source):
+        case None, _:
+            pass
+
+        case None, IncompleteScan():
+            diagnostics.append(
+                lsp.Diagnostic(
+                    message="File is malformed",
+                    range=lsp.Range(
+                        start=lsp.Position(line=0, character=0),
+                        end=lsp.Position(line=0, character=0),
+                    ),
+                    severity=lsp.DiagnosticSeverity.Warning,
+                )
+            )
+            pass
+
+        case validator, scan_result:
+            diagnostics.extend(get_diagnostics(validator, scan_result))
 
     if diagnostics:
         server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
@@ -63,10 +82,27 @@ def on_changed(params: lsp.DidOpenTextDocumentParams) -> None:
     # source = params.text_document.text
 
     file_stem = Path(uri).stem
-    validator = validators.get(file_stem, None)
     diagnostics = []
-    if validator := validators.get(file_stem, None):
-        diagnostics.extend(get_diagnostics(validator, doc.source))
+
+    match get_validator_and_scan(file_stem, doc.source):
+        case None, _:
+            pass
+
+        case None, IncompleteScan():
+            diagnostics.append(
+                lsp.Diagnostic(
+                    message="File is malformed",
+                    range=lsp.Range(
+                        start=lsp.Position(line=0, character=0),
+                        end=lsp.Position(line=0, character=0),
+                    ),
+                    severity=lsp.DiagnosticSeverity.Warning,
+                )
+            )
+            pass
+
+        case validator, scan_result:
+            diagnostics.extend(get_diagnostics(validator, scan_result))
 
     server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
@@ -80,7 +116,9 @@ def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     document = ls.workspace.get_text_document(document_uri)
 
     file_stem = Path(uri).stem
-    if not (validator := validators.get(file_stem, None)):
+    validator, _ = get_validator_and_scan(file_stem, document.source)
+
+    if validator is None:
         return None
 
     if not (
@@ -90,9 +128,9 @@ def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     ):
         return None
 
-    description = get_description_from_path(
-        path=path, schema=cast(Schema, validator.schema)
-    )
+    # This is needed to get a dereferenced schema we can walk through
+    schema = next(validator.iter_errors({})).schema
+    description = get_description_from_path(path=path, schema=cast(Schema, schema))
     return lsp.Hover(
         contents=lsp.MarkupContent(
             kind=lsp.MarkupKind.Markdown,
