@@ -2,6 +2,7 @@ import json
 from collections import deque
 from textwrap import dedent
 
+import yaml
 from hypothesis import assume, example, given
 from hypothesis import strategies as st
 from jsonschema.validators import validator_for
@@ -15,6 +16,7 @@ from craft_ls.core import (
     get_schema_path_from_token_position,
     scan_for_tokens,
 )
+from craft_ls.types_ import ScanResult
 
 # Adapted from json-schema.org
 schema = json.loads(
@@ -190,9 +192,10 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
+    scanned_document = ScanResult([], yaml.safe_load(document))
 
     # When
-    diagnostics = get_diagnostics(validator, document)
+    diagnostics = get_diagnostics(validator, scanned_document)
 
     # Then
     assert len(diagnostics) == 2

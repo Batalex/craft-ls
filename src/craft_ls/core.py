@@ -7,14 +7,17 @@ from collections import deque
 from importlib.resources import files
 from itertools import tee
 from textwrap import shorten
-from typing import Iterable, cast
+from typing import Any, Generator, Iterable, cast
 
+import jsonref
 import yaml
-from jsonschema import ValidationError
+from jsonschema import Draft202012Validator, ValidationError
 from jsonschema.exceptions import best_match
 from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 from yaml.events import (
     DocumentEndEvent,
     Event,
@@ -53,12 +56,58 @@ DEFAULT_RANGE = lsp.Range(
 
 logger = logging.getLogger(__name__)
 
-validators: dict[str, Validator] = {}
+default_validators: dict[str, Validator] = {}
+charmcraft_registry: Registry
 for file_type in FILE_TYPES:
+    schema_str = files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
     schema = json.loads(
         files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
     )
-    validators[file_type] = validator_for(schema)(schema)
+    default_validators[file_type] = validator_for(schema)(schema)
+    if file_type == "charmcraft":
+        schema = Resource.from_contents(
+            jsonref.loads(schema_str), default_specification=DRAFT202012
+        )
+        charmcraft_registry = schema @ Registry()
+
+
+class MissingTypeCharmcraftValidator:
+    """No op implementation.
+
+    Used if charmcraft.yaml is missing the 'type' key or is set to 'bundle'.
+    """
+
+    def iter_errors(
+        self, instance: Any, _schema: Any = None
+    ) -> Generator[ValidationError, None, None]:
+        """Lazily yield each of the validation errors in the given instance."""
+        yield ValidationError(
+            validator="required",
+            path=deque([]),
+            message="'type' key is mandatory and must be 'charm'",
+            schema={},
+        )
+
+
+def get_validator_and_scan(
+    file_stem: str, instance_document: str
+) -> tuple[Validator | None, ScanResult]:
+    """Get the most appropriate validator for the current document."""
+    scanned_tokens = scan_for_tokens(instance_document)
+
+    if file_stem in ("snapcraft", "rockcraft"):
+        return default_validators[file_stem], scanned_tokens
+
+    if file_stem == "charmcraft":
+        if scanned_tokens.instance.get("type") != "charm":
+            return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
+
+        validator = Draft202012Validator(
+            schema={"$ref": "urn:charmcraft:platformcharm"},
+            registry=charmcraft_registry,
+        )
+        return cast(Validator, validator), scanned_tokens
+    return None, scanned_tokens
 
 
 def scan_for_tokens(instance_document: str) -> ScanResult:
@@ -105,10 +154,9 @@ def robust_load(instance_document: str) -> YamlDocument:
 
 
 def get_diagnostics(
-    validator: Validator, instance_document: str
+    validator: Validator, scanned_tokens: ScanResult
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
-    scanned_tokens = scan_for_tokens(instance_document)
     tokens = list(scanned_tokens.tokens)
     diagnostics = []
 
@@ -245,7 +293,7 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
     for segment in path:
         sub = sub.get("properties", {}).get(segment, {})
 
-    return str(sub.get("description", MISSING_DESC))
+    return str(sub.get("description", sub.get("title", MISSING_DESC)))
 
 
 def get_schema_path_from_token_position(

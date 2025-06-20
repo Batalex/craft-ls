@@ -18,6 +18,8 @@ dependencies = [
   "lsprotocol>=2023.0.0",
   "jsonschema>=4.23.0",
   "pyyaml>=6.0.2",
+  "referencing>=0.36.2",
+  "jsonref>=1.1.0",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -89,6 +91,12 @@ known-first-party = ["craft_ls"]
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+module = [
+  "jsonref",
+]
+ignore_missing_imports = true
 
 [tool.pyright]
 enableReachabilityAnalysis = false  # unreliable
