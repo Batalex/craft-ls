@@ -157,7 +157,6 @@ def get_diagnostics(
     validator: Validator, scanned_tokens: ScanResult
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
-    # scanned_tokens = scan_for_tokens(instance_document)
     tokens = list(scanned_tokens.tokens)
     diagnostics = []
 
