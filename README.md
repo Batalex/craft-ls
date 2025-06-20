@@ -17,7 +17,7 @@ Get on\
 | Feature              | Snapcraft | Rockcraft | Charmcraft[^1] |
 | :------------------- | :-------: | :-------: | :------------: |
 | Diagnostics          |    ✅     |    ✅     |       ✅       |
-| Symbol documentation |    ✅     |    ✅     |       ❌       |
+| Symbol documentation |    ✅     |    ✅     |       ✅       |
 | Autocompletion       |    ❌     |    ❌     |       ❌       |
 
 https://github.com/user-attachments/assets/e4b831b5-dcac-4efd-aabb-d3040899b52b
