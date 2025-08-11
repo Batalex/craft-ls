@@ -3,6 +3,7 @@
 import logging
 import os
 from pathlib import Path
+from textwrap import shorten
 from typing import cast
 
 from lsprotocol import types as lsp
@@ -18,12 +19,19 @@ from craft_ls.core import (
 from craft_ls.types_ import IncompleteScan, Schema
 
 IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
+MSG_SIZE = 79
 
 logger = logging.getLogger(__name__)
 server = LanguageServer(
     name="craft-ls",
     version=__version__,
 )
+
+
+def shorten_messages(diagnostics: list[lsp.Diagnostic]) -> None:
+    """Shorten diagnostics messages to better fit an editor view."""
+    for diagnostic in diagnostics:
+        diagnostic.message = shorten(diagnostic.message, MSG_SIZE)
 
 
 @server.feature(lsp.TEXT_DOCUMENT_DID_OPEN)
@@ -69,6 +77,7 @@ def on_opened(params: lsp.DidOpenTextDocumentParams) -> None:
         case validator, scan_result:
             diagnostics.extend(get_diagnostics(validator, scan_result))
 
+    shorten_messages(diagnostics)
     if diagnostics:
         server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
@@ -104,6 +113,7 @@ def on_changed(params: lsp.DidOpenTextDocumentParams) -> None:
         case validator, scan_result:
             diagnostics.extend(get_diagnostics(validator, scan_result))
 
+    shorten_messages(diagnostics)
     server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
 
 

@@ -6,7 +6,6 @@ import re
 from collections import deque
 from importlib.resources import files
 from itertools import tee
-from textwrap import shorten
 from typing import Any, Generator, Iterable, cast
 
 import jsonref
@@ -48,7 +47,6 @@ from craft_ls.types_ import (
 SOURCE = "craft-ls"
 FILE_TYPES = ["snapcraft", "rockcraft", "charmcraft"]
 MISSING_DESC = "No description to display"
-SIZE = 79
 DEFAULT_RANGE = lsp.Range(
     start=lsp.Position(line=0, character=0),
     end=lsp.Position(line=0, character=0),
@@ -182,7 +180,7 @@ def get_diagnostics(
                 for range_ in ranges:
                     diagnostics.append(
                         lsp.Diagnostic(
-                            message=shorten(message, SIZE),
+                            message=message,
                             severity=lsp.DiagnosticSeverity.Error,
                             range=range_,
                             source=SOURCE,
@@ -200,7 +198,7 @@ def get_diagnostics(
 
                 diagnostics.append(
                     lsp.Diagnostic(
-                        message=shorten(message, SIZE),
+                        message=message,
                         severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
@@ -218,7 +216,7 @@ def get_diagnostics(
 
                 diagnostics.append(
                     lsp.Diagnostic(
-                        message=shorten(message, SIZE),
+                        message=message,
                         severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
