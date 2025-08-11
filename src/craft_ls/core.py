@@ -12,7 +12,7 @@ from typing import Any, Generator, Iterable, cast
 import jsonref
 import yaml
 from jsonschema import Draft202012Validator, ValidationError
-from jsonschema.exceptions import best_match
+from jsonschema.exceptions import relevance
 from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
@@ -162,11 +162,11 @@ def get_diagnostics(
 
     for error in validator.iter_errors(scanned_tokens.instance):
         if error.context:
-            error = cast(ValidationError, best_match(error.context))
+            error = sorted(error.context, key=relevance)[0]
 
         match error:
             case ValidationError(
-                validator="additionalProperties", path=path, message=message
+                validator="additionalProperties", absolute_path=path, message=message
             ):
                 ranges = [DEFAULT_RANGE]
                 pattern = r"\((?P<keys>.*) (was|were) unexpected\)"
@@ -190,7 +190,10 @@ def get_diagnostics(
                     )
 
             case ValidationError(
-                validator="required", path=path, message=message, schema={**schema}
+                validator="required",
+                absolute_path=path,
+                message=message,
+                schema={**schema},
             ):
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
                 message = str(schema.get("err_msg", message))
@@ -204,7 +207,9 @@ def get_diagnostics(
                     )
                 )
 
-            case ValidationError(path=path, message=str(message), schema={**schema}):
+            case ValidationError(
+                absolute_path=path, message=str(message), schema={**schema}
+            ):
                 # The sub-error might have a path we should highlight
                 path = deque(cast(Iterable[str], schema.get("err_path", path)))
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
@@ -240,6 +245,8 @@ def get_faulty_token_range(
     target_level: int | None
     segment: str | int | None
 
+    if not path_segments:
+        return DEFAULT_RANGE
     path_iterator = iter(enumerate(path_segments))
     target_level, segment = next(path_iterator)
     # We keep track of the nested elements by incrementing/decrementing the level
