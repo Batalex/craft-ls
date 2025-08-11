@@ -6,13 +6,12 @@ import re
 from collections import deque
 from importlib.resources import files
 from itertools import tee
-from textwrap import shorten
 from typing import Any, Generator, Iterable, cast
 
 import jsonref
 import yaml
 from jsonschema import Draft202012Validator, ValidationError
-from jsonschema.exceptions import best_match
+from jsonschema.exceptions import relevance
 from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
@@ -48,7 +47,6 @@ from craft_ls.types_ import (
 SOURCE = "craft-ls"
 FILE_TYPES = ["snapcraft", "rockcraft", "charmcraft"]
 MISSING_DESC = "No description to display"
-SIZE = 79
 DEFAULT_RANGE = lsp.Range(
     start=lsp.Position(line=0, character=0),
     end=lsp.Position(line=0, character=0),
@@ -162,11 +160,11 @@ def get_diagnostics(
 
     for error in validator.iter_errors(scanned_tokens.instance):
         if error.context:
-            error = cast(ValidationError, best_match(error.context))
+            error = sorted(error.context, key=relevance)[0]
 
         match error:
             case ValidationError(
-                validator="additionalProperties", path=path, message=message
+                validator="additionalProperties", absolute_path=path, message=message
             ):
                 ranges = [DEFAULT_RANGE]
                 pattern = r"\((?P<keys>.*) (was|were) unexpected\)"
@@ -182,7 +180,7 @@ def get_diagnostics(
                 for range_ in ranges:
                     diagnostics.append(
                         lsp.Diagnostic(
-                            message=shorten(message, SIZE),
+                            message=message,
                             severity=lsp.DiagnosticSeverity.Error,
                             range=range_,
                             source=SOURCE,
@@ -190,21 +188,26 @@ def get_diagnostics(
                     )
 
             case ValidationError(
-                validator="required", path=path, message=message, schema={**schema}
+                validator="required",
+                absolute_path=path,
+                message=message,
+                schema={**schema},
             ):
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
                 message = str(schema.get("err_msg", message))
 
                 diagnostics.append(
                     lsp.Diagnostic(
-                        message=shorten(message, SIZE),
+                        message=message,
                         severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
                     )
                 )
 
-            case ValidationError(path=path, message=str(message), schema={**schema}):
+            case ValidationError(
+                absolute_path=path, message=str(message), schema={**schema}
+            ):
                 # The sub-error might have a path we should highlight
                 path = deque(cast(Iterable[str], schema.get("err_path", path)))
                 range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
@@ -213,7 +216,7 @@ def get_diagnostics(
 
                 diagnostics.append(
                     lsp.Diagnostic(
-                        message=shorten(message, SIZE),
+                        message=message,
                         severity=lsp.DiagnosticSeverity.Error,
                         range=range_,
                         source=SOURCE,
@@ -240,6 +243,8 @@ def get_faulty_token_range(
     target_level: int | None
     segment: str | int | None
 
+    if not path_segments:
+        return DEFAULT_RANGE
     path_iterator = iter(enumerate(path_segments))
     target_level, segment = next(path_iterator)
     # We keep track of the nested elements by incrementing/decrementing the level
