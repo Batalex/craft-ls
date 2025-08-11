@@ -101,8 +101,9 @@ def get_validator_and_scan(
             return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
 
         validator = Draft202012Validator(
-            schema={"$ref": "urn:charmcraft:platformcharm"},
-            registry=charmcraft_registry,
+            schema=charmcraft_registry.resolver()
+            .lookup("urn:charmcraft:platformcharm")
+            .contents
         )
         return cast(Validator, validator), scanned_tokens
     return None, scanned_tokens

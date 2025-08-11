@@ -138,9 +138,9 @@ def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     ):
         return None
 
-    # This is needed to get a dereferenced schema we can walk through
-    schema = next(validator.iter_errors({})).schema
-    description = get_description_from_path(path=path, schema=cast(Schema, schema))
+    description = get_description_from_path(
+        path=path, schema=cast(Schema, validator.schema)
+    )
     return lsp.Hover(
         contents=lsp.MarkupContent(
             kind=lsp.MarkupKind.Markdown,
