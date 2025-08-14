@@ -1,6 +1,5 @@
 """Parser-validator core logic."""
 
-import json
 import logging
 import re
 from collections import deque
@@ -10,6 +9,7 @@ from typing import Any, Generator, Iterable, cast
 
 import jsonref
 import yaml
+from jsonpath_ng import parse
 from jsonschema import Draft202012Validator, ValidationError
 from jsonschema.exceptions import relevance
 from jsonschema.protocols import Validator
@@ -58,7 +58,7 @@ default_validators: dict[str, Validator] = {}
 charmcraft_registry: Registry
 for file_type in FILE_TYPES:
     schema_str = files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
-    schema = json.loads(
+    schema = jsonref.loads(
         files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
     )
     default_validators[file_type] = validator_for(schema)(schema)
@@ -293,13 +293,50 @@ def get_faulty_token_range(
     return DEFAULT_RANGE
 
 
+def sanatize_key(key: str) -> str:
+    """Sanatize key."""
+    return re.sub(r"""['"\\*]""", "", key)
+
+
 def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
     """Given an element path, get its description."""
+    # The first part of the query must always be a perfect match according to all
+    # schemas. It's also better for performance.
+    head, *tail = path
+    query = f"$.properties.{sanatize_key(str(head))}"
+    if tail:
+        sub_query = "..".join(
+            [
+                f"'{sanatize_key(str(p))}'|additionalProperties|patternProperties"
+                for p in tail
+            ]
+        )
+        query = f"{query}..{sub_query}"
+    query = f"{query}.description|title"
+    parser = parse(query)
+    candidates = parser.find(schema)
+
+    if candidates:
+        return str(candidates[0].value).capitalize()
+    else:
+        return MISSING_DESC
+
+
+def get_description_from_path_snapcraft(
+    path: Iterable[str | int], schema: Schema
+) -> str:
+    """Given an element path, get its description.
+
+    Limited in capability, as snapcraft schema used patterned properties.
+    """
     sub = schema
     for segment in path:
+        if "patternProperties" in sub:
+            sub = next(iter(sub["patternProperties"].values()), cast(Schema, {}))
+            continue
         sub = sub.get("properties", {}).get(segment, {})
 
-    return str(sub.get("description", sub.get("title", MISSING_DESC)))
+    return str(sub.get("description", sub.get("title", MISSING_DESC))).capitalize()
 
 
 def get_schema_path_from_token_position(
