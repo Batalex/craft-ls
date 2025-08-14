@@ -20,6 +20,7 @@ dependencies = [
   "pyyaml>=6.0.2",
   "referencing>=0.36.2",
   "jsonref>=1.1.0",
+  "jsonpath-ng>=1.7.0",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -95,6 +96,7 @@ strict = true
 [[tool.mypy.overrides]]
 module = [
   "jsonref",
+  "jsonpath_ng"
 ]
 ignore_missing_imports = true
 

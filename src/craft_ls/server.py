@@ -12,6 +12,7 @@ from pygls.server import LanguageServer
 from craft_ls import __version__
 from craft_ls.core import (
     get_description_from_path,
+    get_description_from_path_snapcraft,
     get_diagnostics,
     get_schema_path_from_token_position,
     get_validator_and_scan,
@@ -138,9 +139,17 @@ def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     ):
         return None
 
-    # This is needed to get a dereferenced schema we can walk through
-    schema = next(validator.iter_errors({})).schema
-    description = get_description_from_path(path=path, schema=cast(Schema, schema))
+    if file_stem != "snapcraft":
+        description = get_description_from_path(
+            path=path, schema=cast(Schema, validator.schema)
+        )
+
+    else:
+        # TODO(snap): Change this once the jsonschema is more query-able.
+        description = get_description_from_path_snapcraft(
+            path=path, schema=cast(Schema, validator.schema)
+        )
+
     return lsp.Hover(
         contents=lsp.MarkupContent(
             kind=lsp.MarkupKind.Markdown,

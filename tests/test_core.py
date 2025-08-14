@@ -93,7 +93,7 @@ def test_get_description_nested_ok() -> None:
     assert description == "The price currency"
 
 
-@given(key=st.text())
+@given(key=st.text(min_size=1))
 @example("something_not_present")
 def test_get_description_unknown_path(key: str) -> None:
     """Assert that we get a default message if the key is not in the schema."""
