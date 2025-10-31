@@ -112,7 +112,7 @@ class MissingTypeSnapcraftValidator:
         )
 
 
-def get_validator_and_scan(
+def get_validator_and_scan(  # noqa: C901
     file_stem: str, instance_document: str
 ) -> tuple[Validator, ScanResult] | None:
     """Get the most appropriate validator for the current document."""
@@ -127,6 +127,7 @@ def get_validator_and_scan(
     elif file_stem == "snapcraft":
         base = scanned_tokens.instance.get("base", None)
         build_base = scanned_tokens.instance.get("build-base", None)
+        validator: Draft202012Validator | MissingTypeSnapcraftValidator
         match base, build_base:
             case "core22", _:
                 validator = Draft202012Validator(
@@ -172,9 +173,9 @@ def get_validator_and_scan(
                 )
 
             case _:
-                validator = cast(Validator, MissingTypeSnapcraftValidator())
+                validator = MissingTypeSnapcraftValidator()
 
-        return validator, scanned_tokens
+        return cast(Validator, validator), scanned_tokens
 
     else:
         # by elimination, file_stem is charmcraft
