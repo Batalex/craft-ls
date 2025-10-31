@@ -89,24 +89,26 @@ class MissingTypeCharmcraftValidator:
 
 def get_validator_and_scan(
     file_stem: str, instance_document: str
-) -> tuple[Validator | None, ScanResult]:
+) -> tuple[Validator, ScanResult] | None:
     """Get the most appropriate validator for the current document."""
+    if file_stem not in FILE_TYPES:
+        return None
+
     scanned_tokens = scan_for_tokens(instance_document)
 
     if file_stem in ("snapcraft", "rockcraft"):
         return default_validators[file_stem], scanned_tokens
 
-    if file_stem == "charmcraft":
-        if scanned_tokens.instance.get("type") != "charm":
-            return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
+    # by elimination, file_stem is charmcraft
+    if scanned_tokens.instance.get("type") != "charm":
+        return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
 
-        validator = Draft202012Validator(
-            schema=charmcraft_registry.resolver()
-            .lookup("urn:charmcraft:platformcharm")
-            .contents
-        )
-        return cast(Validator, validator), scanned_tokens
-    return None, scanned_tokens
+    validator = Draft202012Validator(
+        schema=charmcraft_registry.resolver()
+        .lookup("urn:charmcraft:platformcharm")
+        .contents
+    )
+    return cast(Validator, validator), scanned_tokens
 
 
 def scan_for_tokens(instance_document: str) -> ScanResult:
@@ -327,7 +329,7 @@ def get_description_from_path_snapcraft(
 ) -> str:
     """Given an element path, get its description.
 
-    Limited in capability, as snapcraft schema used patterned properties.
+    Limited in capability, as snapcraft schema uses patterned properties.
     """
     sub = schema
     for segment in path:

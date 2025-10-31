@@ -17,7 +17,7 @@ from craft_ls.core import (
     get_schema_path_from_token_position,
     get_validator_and_scan,
 )
-from craft_ls.types_ import IncompleteScan, Schema
+from craft_ls.types_ import Schema
 
 IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV")
 MSG_SIZE = 79
@@ -59,21 +59,8 @@ def on_opened(params: lsp.DidOpenTextDocumentParams) -> None:
     )
 
     match get_validator_and_scan(file_stem, source):
-        case None, _:
-            pass
-
-        case None, IncompleteScan():
-            diagnostics.append(
-                lsp.Diagnostic(
-                    message="File is malformed",
-                    range=lsp.Range(
-                        start=lsp.Position(line=0, character=0),
-                        end=lsp.Position(line=0, character=0),
-                    ),
-                    severity=lsp.DiagnosticSeverity.Warning,
-                )
-            )
-            pass
+        case None:
+            return
 
         case validator, scan_result:
             diagnostics.extend(get_diagnostics(validator, scan_result))
@@ -95,21 +82,8 @@ def on_changed(params: lsp.DidOpenTextDocumentParams) -> None:
     diagnostics = []
 
     match get_validator_and_scan(file_stem, doc.source):
-        case None, _:
-            pass
-
-        case None, IncompleteScan():
-            diagnostics.append(
-                lsp.Diagnostic(
-                    message="File is malformed",
-                    range=lsp.Range(
-                        start=lsp.Position(line=0, character=0),
-                        end=lsp.Position(line=0, character=0),
-                    ),
-                    severity=lsp.DiagnosticSeverity.Warning,
-                )
-            )
-            pass
+        case None:
+            return
 
         case validator, scan_result:
             diagnostics.extend(get_diagnostics(validator, scan_result))
@@ -127,10 +101,16 @@ def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     document = ls.workspace.get_text_document(document_uri)
 
     file_stem = Path(uri).stem
-    validator, _ = get_validator_and_scan(file_stem, document.source)
 
-    if validator is None:
-        return None
+    match get_validator_and_scan(file_stem, document.source):
+        case None:
+            return None
+
+        case None, _:
+            return None
+
+        case validator_found, _:
+            validator = validator_found
 
     if not (
         path := get_schema_path_from_token_position(
