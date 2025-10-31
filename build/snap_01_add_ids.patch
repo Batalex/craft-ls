@@ -1,0 +1,64 @@
+--- .build/snapcraft_upstream.json.orig	2025-10-31 14:39:20.642999620 +0100
++++ src/craft_ls/schemas/snapcraft.json	2025-10-31 15:10:13.397566863 +0100
+@@ -1,4 +1,5 @@
+ {
++  "$id": "#snapcraft",
+   "$defs": {
+     "App": {
+       "additionalProperties": false,
+@@ -503,6 +504,7 @@
+       "type": "object"
+     },
+     "BareCore22Project": {
++			"$id": "urn:snapcraft:bare22",
+       "additionalProperties": false,
+       "properties": {
+         "name": {
+@@ -1090,6 +1092,7 @@
+       "type": "object"
+     },
+     "BareCore24Project": {
++			"$id": "urn:snapcraft:bare24",
+       "additionalProperties": false,
+       "properties": {
+         "name": {
+@@ -1678,6 +1681,7 @@
+       "type": "object"
+     },
+     "BaseCore22Project": {
++			"$id": "urn:snapcraft:base22",
+       "additionalProperties": false,
+       "properties": {
+         "name": {
+@@ -2259,6 +2263,7 @@
+       "type": "object"
+     },
+     "BaseCore24Project": {
++			"$id": "urn:snapcraft:base24",
+       "additionalProperties": false,
+       "properties": {
+         "name": {
+@@ -2840,6 +2845,7 @@
+       "type": "object"
+     },
+     "BaseDevelProject": {
++			"$id": "urn:snapcraft:devel",
+       "additionalProperties": false,
+       "properties": {
+         "name": {
+@@ -3555,6 +3561,7 @@
+       "type": "object"
+     },
+     "Core22Project": {
++			"$id": "urn:snapcraft:core22",
+       "additionalProperties": false,
+       "properties": {
+         "name": {
+@@ -4151,6 +4158,7 @@
+       "type": "object"
+     },
+     "Core24Project": {
++			"$id": "urn:snapcraft:core24",
+       "additionalProperties": false,
+       "properties": {
+         "name": {

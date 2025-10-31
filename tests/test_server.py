@@ -52,7 +52,4 @@ async def test_diagnostic_on_open(client: LanguageClient):
 
     # Then
     assert (diagnostics := client.diagnostics.get(test_uri, []))
-    assert any(
-        "'plugin' is a required property" in diagnostic.message
-        for diagnostic in diagnostics
-    )
+    assert any("is mandatory" in diagnostic.message for diagnostic in diagnostics)
