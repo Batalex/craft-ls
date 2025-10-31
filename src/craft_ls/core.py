@@ -62,11 +62,18 @@ for file_type in FILE_TYPES:
         files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
     )
     default_validators[file_type] = validator_for(schema)(schema)
+
     if file_type == "charmcraft":
         schema = Resource.from_contents(
             jsonref.loads(schema_str), default_specification=DRAFT202012
         )
         charmcraft_registry = schema @ Registry()
+
+    if file_type == "snapcraft":
+        schema = Resource.from_contents(
+            jsonref.loads(schema_str), default_specification=DRAFT202012
+        )
+        snapcraft_registry = schema @ Registry()
 
 
 class MissingTypeCharmcraftValidator:
@@ -87,6 +94,24 @@ class MissingTypeCharmcraftValidator:
         )
 
 
+class MissingTypeSnapcraftValidator:
+    """No op implementation.
+
+    Used if snapcraft.yaml is missing the 'base' or 'build-base' key.
+    """
+
+    def iter_errors(
+        self, instance: Any, _schema: Any = None
+    ) -> Generator[ValidationError, None, None]:
+        """Lazily yield each of the validation errors in the given instance."""
+        yield ValidationError(
+            validator="required",
+            path=deque([]),
+            message="Filling 'base' and/or 'build-base' key(s) is mandatory.",
+            schema={},
+        )
+
+
 def get_validator_and_scan(
     file_stem: str, instance_document: str
 ) -> tuple[Validator, ScanResult] | None:
@@ -96,18 +121,71 @@ def get_validator_and_scan(
 
     scanned_tokens = scan_for_tokens(instance_document)
 
-    if file_stem in ("snapcraft", "rockcraft"):
+    if file_stem == "rockcraft":
         return default_validators[file_stem], scanned_tokens
 
-    # by elimination, file_stem is charmcraft
-    if scanned_tokens.instance.get("type") != "charm":
-        return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
+    elif file_stem == "snapcraft":
+        base = scanned_tokens.instance.get("base", None)
+        build_base = scanned_tokens.instance.get("build-base", None)
+        match base, build_base:
+            case "core22", _:
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:core22")
+                    .contents
+                )
+            case "core24", _:
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:core24")
+                    .contents
+                )
+            case "bare", "core22":
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:bare22")
+                    .contents
+                )
+            case "bare", "core24":
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:bare24")
+                    .contents
+                )
+            case _, "core22":
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:base22")
+                    .contents
+                )
+            case _, "core24":
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:base24")
+                    .contents
+                )
+            case _, "devel":
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:devel")
+                    .contents
+                )
 
-    validator = Draft202012Validator(
-        schema=charmcraft_registry.resolver()
-        .lookup("urn:charmcraft:platformcharm")
-        .contents
-    )
+            case _:
+                validator = cast(Validator, MissingTypeSnapcraftValidator())
+
+        return validator, scanned_tokens
+
+    else:
+        # by elimination, file_stem is charmcraft
+        if scanned_tokens.instance.get("type") != "charm":
+            return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
+
+        validator = Draft202012Validator(
+            schema=charmcraft_registry.resolver()
+            .lookup("urn:charmcraft:platformcharm")
+            .contents
+        )
     return cast(Validator, validator), scanned_tokens
 
 
@@ -322,23 +400,6 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
         return str(candidates[0].value).capitalize()
     else:
         return MISSING_DESC
-
-
-def get_description_from_path_snapcraft(
-    path: Iterable[str | int], schema: Schema
-) -> str:
-    """Given an element path, get its description.
-
-    Limited in capability, as snapcraft schema uses patterned properties.
-    """
-    sub = schema
-    for segment in path:
-        if "patternProperties" in sub:
-            sub = next(iter(sub["patternProperties"].values()), cast(Schema, {}))
-            continue
-        sub = sub.get("properties", {}).get(segment, {})
-
-    return str(sub.get("description", sub.get("title", MISSING_DESC))).capitalize()
 
 
 def get_schema_path_from_token_position(
