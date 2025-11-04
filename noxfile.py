@@ -9,9 +9,13 @@ nox.options.default_venv_backend = "uv"
 nox.options.reuse_venv = "yes"
 nox.options.sessions = ["fmt", "lint"]
 
-SNAPCRAFT_URL = "https://raw.githubusercontent.com/canonical/snapcraft/refs/heads/main/schema/snapcraft.json"
-ROCKCRAFT_URL = "https://raw.githubusercontent.com/canonical/rockcraft/refs/heads/main/schema/rockcraft.json"
-CHARMCRAFT_URL = "https://raw.githubusercontent.com/canonical/charmcraft/refs/heads/main/schema/charmcraft.json"
+# TODO: Pin versions to tagged release for all tools
+CHARM_VERSION = "4.0.1"
+SNAP_VERSION = "551a793ae20241db56b7edf9049070a72f5f593b"
+ROCK_VERSION = "6553ac9de239be758f5cf648eb65c580709c4fc5"
+SNAPCRAFT_URL = f"https://raw.githubusercontent.com/canonical/snapcraft/{SNAP_VERSION}/schema/snapcraft.json"
+ROCKCRAFT_URL = f"https://raw.githubusercontent.com/canonical/rockcraft/{ROCK_VERSION}/schema/rockcraft.json"
+CHARMCRAFT_URL = f"https://raw.githubusercontent.com/canonical/charmcraft/refs/tags/{CHARM_VERSION}/schema/charmcraft.json"
 
 
 @nox.session()
@@ -60,9 +64,9 @@ def tests(session: nox.Session) -> None:
 
 @nox.session()
 def build_schemas(session=nox.Session) -> None:
-    """Fetch the latest schemas available and apply patches."""
+    """Fetch the upstream schemas and apply patches."""
     tmp_build = Path(".build")
-    resources_build = Path("build")
+    resources_build = Path("dev")
     src = Path("src")
     tmp_build.mkdir(exist_ok=True)
 
