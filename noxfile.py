@@ -62,7 +62,7 @@ def tests(session: nox.Session) -> None:
 def build_schemas(session=nox.Session) -> None:
     """Fetch the latest schemas available and apply patches."""
     tmp_build = Path(".build")
-    resources_build = Path("build")
+    resources_build = Path("dev")
     src = Path("src")
     tmp_build.mkdir(exist_ok=True)
 

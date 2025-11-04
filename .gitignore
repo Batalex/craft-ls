@@ -13,6 +13,8 @@ wheels/
 result
 requirements.txt
 *.snap
+.build
 
 # Misc
 .hypothesis
+.helix
