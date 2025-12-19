@@ -7,7 +7,7 @@ from textwrap import shorten
 from typing import cast
 
 from lsprotocol import types as lsp
-from pygls.server import LanguageServer
+from pygls.lsp.server import LanguageServer
 
 from craft_ls import __version__
 from craft_ls.core import (
@@ -66,7 +66,11 @@ def on_opened(params: lsp.DidOpenTextDocumentParams) -> None:
 
     shorten_messages(diagnostics)
     if diagnostics:
-        server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
+        server.text_document_publish_diagnostics(
+            lsp.PublishDiagnosticsParams(
+                uri=uri, version=version, diagnostics=diagnostics
+            )
+        )
 
 
 @server.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)
@@ -88,7 +92,9 @@ def on_changed(params: lsp.DidOpenTextDocumentParams) -> None:
             diagnostics.extend(get_diagnostics(validator, scan_result))
 
     shorten_messages(diagnostics)
-    server.publish_diagnostics(uri=uri, version=version, diagnostics=diagnostics)
+    server.text_document_publish_diagnostics(
+        lsp.PublishDiagnosticsParams(uri=uri, version=version, diagnostics=diagnostics)
+    )
 
 
 @server.feature(lsp.TEXT_DOCUMENT_HOVER)

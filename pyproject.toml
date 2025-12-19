@@ -15,7 +15,7 @@ keywords = [
 requires-python = ">=3.12"
 dependencies = [
   "pygls>=1.1.0",
-  "lsprotocol>=2023.0.0",
+  "lsprotocol>=2025.0.0",
   "jsonschema>=4.23.0",
   "pyyaml>=6.0.2",
   "referencing>=0.36.2",
@@ -39,18 +39,18 @@ Releases = "https://github.com/batalex/craft-ls/releases"
 
 [dependency-groups]
 fmt = [
-  "ruff >=0.8.0,<0.9.0",
+  "ruff >=0.14.0,<0.15.0",
 ]
 lint = [
-  "ruff >=0.8.0,<0.9.0",
+  "ruff >=0.14.0,<0.15.0",
   "mypy >= 1.14.0",
   "types-pyyaml",
   "types-jsonschema",
 ]
 unit = [
   "hypothesis>=6.127.3",
-  "pytest>=8.3.4",
-  "pytest-lsp>=0.4.3",
+  "pytest>=9.0.0",
+  "pytest-lsp>=1.0.0",
 ]
 
 [project.scripts]
@@ -103,6 +103,6 @@ ignore_missing_imports = true
 [tool.pyright]
 enableReachabilityAnalysis = false  # unreliable
 
-[tool.pytest.ini_options]
+[tool.pytest]
 log_cli_level = "INFO"
 asyncio_mode = "auto"
