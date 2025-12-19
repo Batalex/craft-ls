@@ -98,12 +98,11 @@ def on_changed(params: lsp.DidOpenTextDocumentParams) -> None:
 
 
 @server.feature(lsp.TEXT_DOCUMENT_HOVER)
-def hover(ls: LanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
+def hover(params: lsp.HoverParams) -> lsp.Hover | None:
     """Get item description on hover."""
     pos = params.position
     uri = params.text_document.uri
-    document_uri = params.text_document.uri
-    document = ls.workspace.get_text_document(document_uri)
+    document = server.workspace.get_text_document(uri)
 
     file_stem = Path(uri).stem
 
