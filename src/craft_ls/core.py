@@ -37,9 +37,9 @@ from yaml.tokens import (
 )
 
 from craft_ls.types_ import (
-    CompleteScan,
-    IncompleteScan,
-    ScanResult,
+    CompleteParsedResult,
+    IncompleteParsedResult,
+    ParsedResult,
     Schema,
     YamlDocument,
 )
@@ -112,14 +112,14 @@ class MissingTypeSnapcraftValidator:
         )
 
 
-def get_validator_and_scan(  # noqa: C901
+def get_validator_and_parse(  # noqa: C901
     file_stem: str, instance_document: str
-) -> tuple[Validator, ScanResult] | None:
+) -> tuple[Validator, ParsedResult] | None:
     """Get the most appropriate validator for the current document."""
     if file_stem not in FILE_TYPES:
         return None
 
-    scanned_tokens = scan_for_tokens(instance_document)
+    scanned_tokens = parse_tokens(instance_document)
 
     if file_stem == "rockcraft":
         return default_validators[file_stem], scanned_tokens
@@ -190,7 +190,7 @@ def get_validator_and_scan(  # noqa: C901
     return cast(Validator, validator), scanned_tokens
 
 
-def scan_for_tokens(instance_document: str) -> ScanResult:
+def parse_tokens(instance_document: str) -> ParsedResult:
     """Scan the document for yaml tokens."""
     tokens = []
     tokens_iter = yaml.scan(instance_document)
@@ -200,10 +200,10 @@ def scan_for_tokens(instance_document: str) -> ScanResult:
             tokens.append(event)
     except ScannerError:
         instance = robust_load(instance_document)
-        return IncompleteScan(tokens=tokens, instance=instance)
+        return IncompleteParsedResult(tokens=tokens, instance=instance)
 
     instance = cast(YamlDocument, yaml.safe_load(instance_document))
-    return CompleteScan(tokens=tokens, instance=instance)
+    return CompleteParsedResult(tokens=tokens, instance=instance)
 
 
 def robust_load(instance_document: str) -> YamlDocument:
@@ -234,7 +234,7 @@ def robust_load(instance_document: str) -> YamlDocument:
 
 
 def get_diagnostics(
-    validator: Validator, scanned_tokens: ScanResult
+    validator: Validator, scanned_tokens: ParsedResult
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
     tokens = list(scanned_tokens.tokens)
@@ -407,7 +407,7 @@ def get_schema_path_from_token_position(
     position: lsp.Position, instance_document: str
 ) -> deque[str] | None:
     """Parse the document to find the path to the current position."""
-    scanned_tokens = scan_for_tokens(instance_document)
+    scanned_tokens = parse_tokens(instance_document)
     current_path: deque[str] = deque()
     last_scalar_token: str = ""
     start_mark: yaml.Mark

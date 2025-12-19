@@ -14,9 +14,9 @@ from craft_ls.core import (
     get_diagnostics,
     get_faulty_token_range,
     get_schema_path_from_token_position,
-    scan_for_tokens,
+    parse_tokens,
 )
-from craft_ls.types_ import ScanResult
+from craft_ls.types_ import ParsedResult
 
 # Adapted from json-schema.org
 schema = json.loads(
@@ -168,7 +168,7 @@ def test_values_are_not_flagged() -> None:
           currency: euro
         """
     )
-    scan = scan_for_tokens(document)
+    scan = parse_tokens(document)
 
     # When
     range_ = get_faulty_token_range(scan.tokens, ["productName"])
@@ -192,7 +192,7 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
-    scanned_document = ScanResult([], yaml.safe_load(document))
+    scanned_document = ParsedResult([], yaml.safe_load(document))
 
     # When
     diagnostics = get_diagnostics(validator, scanned_document)

@@ -11,22 +11,22 @@ Schema = NewType("Schema", dict[str, Any])
 
 
 @dataclass
-class ScanResult:
-    """Token scan result container."""
+class ParsedResult:
+    """Token parsed result container."""
 
     tokens: list[Token]
     instance: YamlDocument
 
 
 @dataclass
-class CompleteScan(ScanResult):
-    """Indicate a complete scan of the document."""
+class CompleteParsedResult(ParsedResult):
+    """Indicate a complete document parsing."""
 
     pass
 
 
 @dataclass
-class IncompleteScan(ScanResult):
-    """Indicate an incomplete scan of the document."""
+class IncompleteParsedResult(ParsedResult):
+    """Indicate an incomplete parsing of the document."""
 
     pass
