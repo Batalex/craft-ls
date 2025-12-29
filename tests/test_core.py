@@ -1,5 +1,6 @@
 import json
 from collections import deque
+from itertools import chain
 from textwrap import dedent
 
 import yaml
@@ -14,7 +15,9 @@ from craft_ls.core import (
     get_diagnostics,
     get_faulty_token_range,
     get_schema_path_from_token_position,
+    list_symbols,
     parse_tokens,
+    segmentize_nodes,
 )
 
 # Adapted from json-schema.org
@@ -198,3 +201,34 @@ def test_multiple_unexpected_keys() -> None:
     # Then
     assert len(diagnostics) == 2
     assert all("unexpected" in diag.message for diag in diagnostics)
+
+
+def test_list_symbols_correct_levels() -> None:
+    """We only expect 1st level keys and 2nd level keys for specific 1st keys.
+
+    Using the document below, we expect 3 1st level keys and one child key.
+    """
+    # Given
+    document = dedent(
+        """
+        # Some comment
+        foo: bar
+        parts:
+            included-key:
+                all: right
+        unrelated:
+            non-included-key: 50
+        """
+    )
+    segments = dict(segmentize_nodes(yaml.compose(document)))
+
+    # When
+    symbols = list_symbols(yaml.safe_load(document), segments)
+
+    # Then
+    assert len(symbols) == 3
+    children = list(
+        chain.from_iterable([s.children for s in symbols if s.children is not None])
+    )
+    assert len(children) == 1
+    assert children[0].name == "included-key"
