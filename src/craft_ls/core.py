@@ -41,6 +41,7 @@ from craft_ls.types_ import (
     IncompleteParsedResult,
     MissingTypeCharmcraftValidator,
     MissingTypeSnapcraftValidator,
+    Node,
     ParsedResult,
     Schema,
     YamlDocument,
@@ -53,6 +54,7 @@ DEFAULT_RANGE = lsp.Range(
     start=lsp.Position(line=0, character=0),
     end=lsp.Position(line=0, character=0),
 )
+SPECIAL_SYMBOL_PARENTS = {"parts", "apps", "services"}
 
 logger = logging.getLogger(__name__)
 
@@ -473,3 +475,56 @@ def get_schema_path_from_token_position(
                 continue
     return None
 
+
+def list_symbols(
+    instance: YamlDocument, segments: dict[tuple[str, ...], Node]
+) -> list[lsp.DocumentSymbol]:
+    """List document symbols.
+
+    We are only interested in keys up to the second level at most, so we don't need anything
+    fancy here.
+    """
+    symbols = []
+    for top_level_key in instance.keys():
+        node = segments[(top_level_key,)]
+        symbol = lsp.DocumentSymbol(
+            name=node.value,
+            kind=lsp.SymbolKind.Key,
+            range=lsp.Range(
+                start=lsp.Position(node.start.line, node.start.column),
+                end=lsp.Position(node.end.line, node.end.column),
+            ),
+            selection_range=lsp.Range(
+                start=lsp.Position(node.start.line, node.start.column),
+                end=lsp.Position(node.selection_end.line, node.selection_end.column),
+            ),
+        )
+        if top_level_key in SPECIAL_SYMBOL_PARENTS:
+            children_symbols = []
+            for second_level_key in instance[top_level_key].keys():
+                child_node = segments[(top_level_key, second_level_key)]
+                child_symbol = lsp.DocumentSymbol(
+                    name=child_node.value,
+                    kind=lsp.SymbolKind.Key,
+                    range=lsp.Range(
+                        start=lsp.Position(
+                            child_node.start.line, child_node.start.column
+                        ),
+                        end=lsp.Position(child_node.end.line, child_node.end.column),
+                    ),
+                    selection_range=lsp.Range(
+                        start=lsp.Position(
+                            child_node.start.line, child_node.start.column
+                        ),
+                        end=lsp.Position(
+                            child_node.selection_end.line,
+                            child_node.selection_end.column,
+                        ),
+                    ),
+                )
+                children_symbols.append(child_symbol)
+
+            symbol.children = children_symbols
+        symbols.append(symbol)
+
+    return symbols

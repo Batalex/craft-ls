@@ -14,6 +14,7 @@ from craft_ls.core import (
     get_diagnostics,
     get_schema_path_from_token_position,
     get_validator_and_parse,
+    list_symbols,
     segmentize_nodes,
 )
 from craft_ls.settings import IS_DEV_MODE
@@ -168,6 +169,21 @@ def hover(ls: CraftLanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
             end=lsp.Position(line=pos.line + 1, character=0),
         ),
     )
+
+
+@server.feature(lsp.TEXT_DOCUMENT_DOCUMENT_SYMBOL)
+def document_symbol(
+    ls: CraftLanguageServer, params: lsp.DocumentSymbolParams
+) -> list[lsp.DocumentSymbol]:
+    """Return all the symbols defined in the given document."""
+    uri = params.text_document.uri
+    symbols_results: list[lsp.DocumentSymbol] = []
+
+    match ls.index.get(Path(uri)):
+        case IndexEntry(instance=instance, segments=segments):
+            symbols_results = list_symbols(instance, segments)
+
+    return symbols_results
 
 
 def start() -> None:
