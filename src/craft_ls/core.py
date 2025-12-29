@@ -39,6 +39,8 @@ from yaml.tokens import (
 from craft_ls.types_ import (
     CompleteParsedResult,
     IncompleteParsedResult,
+    MissingTypeCharmcraftValidator,
+    MissingTypeSnapcraftValidator,
     ParsedResult,
     Schema,
     YamlDocument,
