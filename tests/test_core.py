@@ -12,11 +12,10 @@ from lsprotocol import types as lsp
 from craft_ls.core import (
     MISSING_DESC,
     get_description_from_path,
+    get_diagnostic_range,
     get_diagnostics,
-    get_faulty_token_range,
     get_schema_path_from_token_position,
     list_symbols,
-    parse_tokens,
     segmentize_nodes,
 )
 
@@ -170,10 +169,10 @@ def test_values_are_not_flagged() -> None:
           currency: euro
         """
     )
-    scan = parse_tokens(document)
+    segments = dict(segmentize_nodes(yaml.compose(document)))
 
     # When
-    range_ = get_faulty_token_range(scan.tokens, ["productName"])
+    range_ = get_diagnostic_range(segments, ["productName"])
 
     # Then
     assert range_.start.line == 3
@@ -194,9 +193,10 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
+    segments = dict(segmentize_nodes(yaml.compose(document)))
 
     # When
-    diagnostics = get_diagnostics(validator, [], yaml.safe_load(document))
+    diagnostics = get_diagnostics(validator, yaml.safe_load(document), segments)
 
     # Then
     assert len(diagnostics) == 2

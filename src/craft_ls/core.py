@@ -33,7 +33,6 @@ from yaml.tokens import (
     BlockSequenceStartToken,
     ScalarToken,
     Token,
-    ValueToken,
 )
 
 from craft_ls.types_ import (
@@ -272,7 +271,7 @@ def _do_segmentize_nodes(
 
 
 def get_diagnostics(
-    validator: Validator, tokens: list[Token], instance: YamlDocument
+    validator: Validator, instance: YamlDocument, segments: dict[tuple[str, ...], Node]
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
     diagnostics = []
@@ -292,7 +291,7 @@ def get_diagnostics(
                 ):
                     keys_cleaned = [key.strip(" '") for key in keys.split(",")]
                     ranges = [
-                        get_faulty_token_range(tokens, list(path) + [key])
+                        get_diagnostic_range(segments, list(path) + [key])
                         for key in keys_cleaned
                     ]
 
@@ -312,8 +311,17 @@ def get_diagnostics(
                 message=message,
                 schema={**schema},
             ):
-                range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
-                message = str(schema.get("err_msg", message))
+                pattern = "'(?P<key>.*)' key is mandatory"
+                if path:
+                    range_ = get_diagnostic_range(segments, path)
+                elif (match := re.search(pattern, message or "")) and (
+                    key := match.group("key")
+                ):
+                    # Const errore can be wrongfully handled here with an empty path,
+                    # so we try to handle those cases gracefully
+                    range_ = get_diagnostic_range(segments, list(path) + [key])
+                else:
+                    range_ = DEFAULT_RANGE
 
                 diagnostics.append(
                     lsp.Diagnostic(
@@ -327,11 +335,8 @@ def get_diagnostics(
             case ValidationError(
                 absolute_path=path, message=str(message), schema={**schema}
             ):
-                # The sub-error might have a path we should highlight
-                path = deque(cast(Iterable[str], schema.get("err_path", path)))
-                range_ = get_faulty_token_range(tokens, path) if path else DEFAULT_RANGE
-                message = str(schema.get("err_msg", message))
-                range_ = get_faulty_token_range(tokens, path)
+                path = cast(list[str], path)
+                range_ = get_diagnostic_range(segments, path) if path else DEFAULT_RANGE
 
                 diagnostics.append(
                     lsp.Diagnostic(
@@ -355,60 +360,27 @@ def peek(tee_iterator: Iterable[Token]) -> Token | None:
     return next(forked_iterator, None)
 
 
-def get_faulty_token_range(
-    tokens: list[Token], path_segments: Iterable[str | int]
+def get_diagnostic_range(
+    document_segments: dict[tuple[str, ...], Node], diag_segments: Iterable[str]
 ) -> lsp.Range:
     """Link the validation error to the position in the original document."""
-    target_level: int | None
-    segment: str | int | None
-
-    if not path_segments:
+    if (
+        not diag_segments
+        or (error_node := document_segments.get(tuple(diag_segments))) is None
+    ):
         return DEFAULT_RANGE
-    path_iterator = iter(enumerate(path_segments))
-    target_level, segment = next(path_iterator)
-    # We keep track of the nested elements by incrementing/decrementing the level
-    # every time we encounted a block token. The very start of the document
-    # counts as a mapping, hence the -1 offset
-    current_level = -1
 
-    # Create a peekable iterator
-    [token_iterator] = tee(tokens, 1)
-
-    for token in token_iterator:
-        match token:
-            case BlockMappingStartToken() | BlockSequenceStartToken():
-                current_level += 1
-
-            case BlockEndToken():
-                current_level -= 1
-
-            case ScalarToken(value=value) if value == segment:
-                nested_level_mismatch = current_level != target_level
-                is_not_key = not isinstance(peek(token_iterator), ValueToken)
-
-                if nested_level_mismatch or is_not_key:
-                    continue
-
-                target_level, segment = next(path_iterator, (None, None))
-                if segment is not None:
-                    continue
-
-                else:  # found our culprit
-                    # TODO(ux): flag up to the next token/block?
-                    range = lsp.Range(
-                        start=lsp.Position(
-                            line=token.start_mark.line,
-                            character=token.start_mark.column,
-                        ),
-                        end=lsp.Position(
-                            line=token.end_mark.line, character=token.end_mark.column
-                        ),
-                    )
-                    return range
-
-            # TODO(array)
-
-    return DEFAULT_RANGE
+    range = lsp.Range(
+        start=lsp.Position(
+            line=error_node.start.line,
+            character=error_node.start.column,
+        ),
+        end=lsp.Position(
+            line=error_node.selection_end.line,
+            character=error_node.selection_end.column,
+        ),
+    )
+    return range
 
 
 def sanatize_key(key: str) -> str:

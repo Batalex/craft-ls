@@ -96,8 +96,8 @@ def on_opened(ls: CraftLanguageServer, params: lsp.DidOpenTextDocumentParams) ->
     )
 
     match ls.parse_file(Path(uri), source):
-        case IndexEntry(validator, tokens, instance):
-            diagnostics.extend(get_diagnostics(validator, tokens, instance))
+        case IndexEntry(validator, instance=instance, segments=segments):
+            diagnostics.extend(get_diagnostics(validator, instance, segments))
 
         case _:
             return
@@ -121,8 +121,8 @@ def on_changed(ls: CraftLanguageServer, params: lsp.DidOpenTextDocumentParams) -
     diagnostics = []
 
     match ls.parse_file(Path(uri), source):
-        case IndexEntry(validator, tokens, instance):
-            diagnostics.extend(get_diagnostics(validator, tokens, instance))
+        case IndexEntry(validator, instance=instance, segments=segments):
+            diagnostics.extend(get_diagnostics(validator, instance, segments))
 
         case _:
             return
