@@ -4,8 +4,8 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Generator, NewType
 
-from yaml import Token
 from jsonschema import ValidationError, Validator
+from yaml import CollectionNode, Mark, Token
 
 # We can probably do better, but that will do for now
 YamlDocument = NewType("YamlDocument", dict[str, Any])
@@ -18,6 +18,7 @@ class ParsedResult:
 
     tokens: list[Token]
     instance: YamlDocument
+    nodes: CollectionNode
 
 
 @dataclass
@@ -32,6 +33,28 @@ class IncompleteParsedResult(ParsedResult):
     """Indicate an incomplete parsing of the document."""
 
     pass
+
+
+@dataclass
+class Node:
+    """Document node."""
+
+    value: str
+    start: Mark
+    end: Mark
+    selection_end: Mark
+
+
+@dataclass
+class IndexEntry:
+    """Document index entry."""
+
+    validator: Validator
+    tokens: list[Token]
+    instance: YamlDocument
+    segments: dict[tuple[str, ...], Node]
+
+
 class MissingTypeCharmcraftValidator:
     """No op implementation.
 

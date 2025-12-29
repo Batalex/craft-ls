@@ -4,8 +4,8 @@ import logging
 import re
 from collections import deque
 from importlib.resources import files
-from itertools import tee
-from typing import Any, Generator, Iterable, cast
+from itertools import chain, tee
+from typing import Iterable, cast
 
 import jsonref
 import yaml
@@ -76,42 +76,6 @@ for file_type in FILE_TYPES:
             jsonref.loads(schema_str), default_specification=DRAFT202012
         )
         snapcraft_registry = schema @ Registry()
-
-
-class MissingTypeCharmcraftValidator:
-    """No op implementation.
-
-    Used if charmcraft.yaml is missing the 'type' key or is set to 'bundle'.
-    """
-
-    def iter_errors(
-        self, instance: Any, _schema: Any = None
-    ) -> Generator[ValidationError, None, None]:
-        """Lazily yield each of the validation errors in the given instance."""
-        yield ValidationError(
-            validator="required",
-            path=deque([]),
-            message="'type' key is mandatory and must be 'charm'",
-            schema={},
-        )
-
-
-class MissingTypeSnapcraftValidator:
-    """No op implementation.
-
-    Used if snapcraft.yaml is missing the 'base' or 'build-base' key.
-    """
-
-    def iter_errors(
-        self, instance: Any, _schema: Any = None
-    ) -> Generator[ValidationError, None, None]:
-        """Lazily yield each of the validation errors in the given instance."""
-        yield ValidationError(
-            validator="required",
-            path=deque([]),
-            message="Filling 'base' and/or 'build-base' key(s) is mandatory.",
-            schema={},
-        )
 
 
 def get_validator_and_parse(  # noqa: C901
@@ -201,14 +165,16 @@ def parse_tokens(instance_document: str) -> ParsedResult:
         for event in tokens_iter:
             tokens.append(event)
     except ScannerError:
-        instance = robust_load(instance_document)
-        return IncompleteParsedResult(tokens=tokens, instance=instance)
+        instance, events = robust_load(instance_document)
+        nodes = yaml.compose(events)
+        return IncompleteParsedResult(tokens=tokens, instance=instance, nodes=nodes)
 
     instance = cast(YamlDocument, yaml.safe_load(instance_document))
-    return CompleteParsedResult(tokens=tokens, instance=instance)
+    nodes = yaml.compose(instance_document)
+    return CompleteParsedResult(tokens=tokens, instance=instance, nodes=nodes)
 
 
-def robust_load(instance_document: str) -> YamlDocument:
+def robust_load(instance_document: str) -> tuple[YamlDocument, list[Event]]:
     """Parse the valid portion of the stream and construct a Python object."""
     events = []
     events_iter = yaml.parse(instance_document)
@@ -232,17 +198,84 @@ def robust_load(instance_document: str) -> YamlDocument:
         closing_sequence.extendleft([DocumentEndEvent(), StreamEndEvent()])
 
     truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
-    return cast(YamlDocument, yaml.safe_load(truncated_file))
+    return cast(YamlDocument, yaml.safe_load(truncated_file)), truncated_file
+
+
+def segmentize_nodes(root: yaml.CollectionNode) -> list[tuple[tuple[str, ...], Node]]:
+    """Flatten graph into path segments."""
+    segments: list[tuple[tuple[str, ...], Node]] = []
+    nodes = list(root.value)
+
+    for node_pair in nodes:
+        segments.extend(_do_segmentize_nodes(*node_pair))
+
+    return segments
+
+
+def _do_segmentize_nodes(
+    first: yaml.CollectionNode,
+    second: yaml.CollectionNode,
+    prefix: tuple[str, ...] | None = None,
+) -> list[tuple[tuple[str, ...], Node]]:
+    """Recursive node segmentation.
+
+    Craft tools don't usually go over three levels, so we don't have to worry about recursion limits.
+    """
+    segments = []
+    prefix = prefix or ()
+
+    match second:
+        case yaml.ScalarNode(end_mark=selection_end):
+            current_node = Node(
+                value=first.value,
+                start=first.start_mark,
+                end=first.end_mark,
+                selection_end=selection_end,
+            )
+            segments.append((prefix + (str(first.value),), current_node))
+
+        case yaml.MappingNode(end_mark=selection_end, value=children):
+            current_node = Node(
+                value=first.value,
+                start=first.start_mark,
+                end=first.end_mark,
+                selection_end=selection_end,
+            )
+            segments.append((prefix + (str(first.value),), current_node))
+            segments.extend(
+                list(
+                    chain.from_iterable(
+                        [
+                            _do_segmentize_nodes(
+                                child[0], child[1], prefix=prefix + (str(first.value),)
+                            )
+                            for child in children
+                        ]
+                    )
+                )
+            )
+
+        case yaml.CollectionNode(end_mark=selection_end):
+            current_node = Node(
+                value=first.value,
+                start=first.start_mark,
+                end=first.end_mark,
+                selection_end=selection_end,
+            )
+            segments.append((prefix + (str(first.value),), current_node))
+        case other:
+            logger.error(other)
+
+    return segments
 
 
 def get_diagnostics(
-    validator: Validator, scanned_tokens: ParsedResult
+    validator: Validator, tokens: list[Token], instance: YamlDocument
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
-    tokens = list(scanned_tokens.tokens)
     diagnostics = []
 
-    for error in validator.iter_errors(scanned_tokens.instance):
+    for error in validator.iter_errors(instance):
         if error.context:
             error = sorted(error.context, key=relevance)[0]
 
@@ -439,3 +472,4 @@ def get_schema_path_from_token_position(
             case _:
                 continue
     return None
+

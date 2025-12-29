@@ -16,7 +16,6 @@ from craft_ls.core import (
     get_schema_path_from_token_position,
     parse_tokens,
 )
-from craft_ls.types_ import ParsedResult
 
 # Adapted from json-schema.org
 schema = json.loads(
@@ -192,10 +191,9 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
-    scanned_document = ParsedResult([], yaml.safe_load(document))
 
     # When
-    diagnostics = get_diagnostics(validator, scanned_document)
+    diagnostics = get_diagnostics(validator, [], yaml.safe_load(document))
 
     # Then
     assert len(diagnostics) == 2
