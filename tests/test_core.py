@@ -16,6 +16,7 @@ from craft_ls.core import (
     get_diagnostics,
     get_schema_path_from_token_position,
     list_symbols,
+    parse_tokens,
     segmentize_nodes,
 )
 
@@ -69,6 +70,8 @@ price:
   currency: euro
 """
 
+parsed_document = parse_tokens(document)
+
 
 def test_get_description_first_level_ok() -> None:
     """Assert that we can get the description from the schema of a first-level key."""
@@ -115,7 +118,7 @@ def test_get_path_from_position_first_level_ok() -> None:
     position = lsp.Position(2, 5)
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert path == deque(["productId"])
@@ -126,7 +129,7 @@ def test_get_path_from_position_nested_ok() -> None:
     position = lsp.Position(5, 5)
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert path == deque(["price", "amount"])
@@ -137,7 +140,7 @@ def test_get_path_from_comment_ko() -> None:
     position = lsp.Position(1, 5)  # comment line
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert not path
@@ -148,7 +151,7 @@ def test_get_path_from_empty_space_ko() -> None:
     position = lsp.Position(4, 10)  # to the right of "price"
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert not path
@@ -169,7 +172,8 @@ def test_values_are_not_flagged() -> None:
           currency: euro
         """
     )
-    segments = dict(segmentize_nodes(yaml.compose(document)))
+    segments = dict(segmentize_nodes(parse_tokens(document).nodes))
+    parsed_document.nodes
 
     # When
     range_ = get_diagnostic_range(segments, ["productName"])
@@ -193,7 +197,7 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
-    segments = dict(segmentize_nodes(yaml.compose(document)))
+    segments = dict(segmentize_nodes(parse_tokens(document).nodes))
 
     # When
     diagnostics = get_diagnostics(validator, yaml.safe_load(document), segments)

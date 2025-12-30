@@ -309,7 +309,6 @@ def get_diagnostics(
                 validator="required",
                 absolute_path=path,
                 message=message,
-                schema={**schema},
             ):
                 pattern = "'(?P<key>.*)' key is mandatory"
                 if path:
@@ -332,9 +331,7 @@ def get_diagnostics(
                     )
                 )
 
-            case ValidationError(
-                absolute_path=path, message=str(message), schema={**schema}
-            ):
+            case ValidationError(absolute_path=path, message=str(message)):
                 path = cast(list[str], path)
                 range_ = get_diagnostic_range(segments, path) if path else DEFAULT_RANGE
 
@@ -413,16 +410,15 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
 
 
 def get_schema_path_from_token_position(
-    position: lsp.Position, instance_document: str
+    position: lsp.Position, tokens: list[Token]
 ) -> deque[str] | None:
     """Parse the document to find the path to the current position."""
-    scanned_tokens = parse_tokens(instance_document)
     current_path: deque[str] = deque()
     last_scalar_token: str = ""
     start_mark: yaml.Mark
     end_mark: yaml.Mark
 
-    for token in scanned_tokens.tokens:
+    for token in tokens:
         match token:
             case BlockMappingStartToken() | BlockSequenceStartToken():
                 current_path.append(last_scalar_token)

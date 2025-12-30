@@ -138,21 +138,15 @@ def hover(ls: CraftLanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     """Get item description on hover."""
     pos = params.position
     uri = params.text_document.uri
-    doc = ls.workspace.get_text_document(uri)
-    source = doc.source
 
     match ls.index.get(Path(uri)):
-        case IndexEntry(validator_found):
+        case IndexEntry(validator_found, tokens=tokens):
             validator = validator_found
 
         case _:
             return None
 
-    if not (
-        path := get_schema_path_from_token_position(
-            position=pos, instance_document=source
-        )
-    ):
+    if not (path := get_schema_path_from_token_position(position=pos, tokens=tokens)):
         return None
 
     description = get_description_from_path(
