@@ -1,5 +1,6 @@
 import json
 from collections import deque
+from itertools import chain
 from textwrap import dedent
 
 import yaml
@@ -11,12 +12,13 @@ from lsprotocol import types as lsp
 from craft_ls.core import (
     MISSING_DESC,
     get_description_from_path,
+    get_diagnostic_range,
     get_diagnostics,
-    get_faulty_token_range,
     get_schema_path_from_token_position,
-    scan_for_tokens,
+    list_symbols,
+    parse_tokens,
+    segmentize_nodes,
 )
-from craft_ls.types_ import ScanResult
 
 # Adapted from json-schema.org
 schema = json.loads(
@@ -68,6 +70,8 @@ price:
   currency: euro
 """
 
+parsed_document = parse_tokens(document)
+
 
 def test_get_description_first_level_ok() -> None:
     """Assert that we can get the description from the schema of a first-level key."""
@@ -114,7 +118,7 @@ def test_get_path_from_position_first_level_ok() -> None:
     position = lsp.Position(2, 5)
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert path == deque(["productId"])
@@ -125,7 +129,7 @@ def test_get_path_from_position_nested_ok() -> None:
     position = lsp.Position(5, 5)
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert path == deque(["price", "amount"])
@@ -136,7 +140,7 @@ def test_get_path_from_comment_ko() -> None:
     position = lsp.Position(1, 5)  # comment line
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert not path
@@ -147,7 +151,7 @@ def test_get_path_from_empty_space_ko() -> None:
     position = lsp.Position(4, 10)  # to the right of "price"
 
     # When
-    path = get_schema_path_from_token_position(position, document)
+    path = get_schema_path_from_token_position(position, parsed_document.tokens)
 
     # Then
     assert not path
@@ -168,10 +172,11 @@ def test_values_are_not_flagged() -> None:
           currency: euro
         """
     )
-    scan = scan_for_tokens(document)
+    segments = dict(segmentize_nodes(parse_tokens(document).nodes))
+    parsed_document.nodes
 
     # When
-    range_ = get_faulty_token_range(scan.tokens, ["productName"])
+    range_ = get_diagnostic_range(segments, ["productName"])
 
     # Then
     assert range_.start.line == 3
@@ -192,11 +197,42 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
-    scanned_document = ScanResult([], yaml.safe_load(document))
+    segments = dict(segmentize_nodes(parse_tokens(document).nodes))
 
     # When
-    diagnostics = get_diagnostics(validator, scanned_document)
+    diagnostics = get_diagnostics(validator, yaml.safe_load(document), segments)
 
     # Then
     assert len(diagnostics) == 2
     assert all("unexpected" in diag.message for diag in diagnostics)
+
+
+def test_list_symbols_correct_levels() -> None:
+    """We only expect 1st level keys and 2nd level keys for specific 1st keys.
+
+    Using the document below, we expect 3 1st level keys and one child key.
+    """
+    # Given
+    document = dedent(
+        """
+        # Some comment
+        foo: bar
+        parts:
+            included-key:
+                all: right
+        unrelated:
+            non-included-key: 50
+        """
+    )
+    segments = dict(segmentize_nodes(yaml.compose(document)))
+
+    # When
+    symbols = list_symbols(yaml.safe_load(document), segments)
+
+    # Then
+    assert len(symbols) == 3
+    children = list(
+        chain.from_iterable([s.children for s in symbols if s.children is not None])
+    )
+    assert len(children) == 1
+    assert children[0].name == "included-key"

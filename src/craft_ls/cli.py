@@ -9,7 +9,8 @@ from pathlib import Path
 
 from lsprotocol import types as lsp
 
-from craft_ls.core import get_diagnostics, get_validator_and_scan
+from craft_ls.core import get_diagnostics, get_validator_and_parse, segmentize_nodes
+from craft_ls.types_ import ParsedResult
 
 logging.basicConfig()
 
@@ -19,13 +20,14 @@ def check(file_name: str) -> None:
     file = Path(file_name)
 
     diagnostics: list[lsp.Diagnostic] = []
-    match get_validator_and_scan(file.stem, file.read_text()):
+    match get_validator_and_parse(file.stem, file.read_text()):
         case None:
             print(f"Cannot validate '{file}'", file=sys.stderr)
             pass
 
-        case validator, scan_result:
-            diagnostics.extend(get_diagnostics(validator, scan_result))
+        case validator, ParsedResult(instance=instance, nodes=nodes):
+            segments = segmentize_nodes(nodes)
+            diagnostics.extend(get_diagnostics(validator, instance, dict(segments)))
 
     if diagnostics:
         for diag in diagnostics:
