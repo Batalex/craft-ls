@@ -523,3 +523,34 @@ def list_symbols(
         symbols.append(symbol)
 
     return symbols
+
+
+def get_completion_items_from_path(
+    segments: Iterable[str], schema: Schema, instance: YamlDocument
+) -> list[lsp.CompletionItem]:
+    """Get possible values for children nodes or enum values."""
+    sub_instance = instance
+    sub_schema = schema
+    for segment in segments:
+        sub_schema = sub_schema.get("properties", {}).get(segment, {})
+        sub_instance = sub_instance.get(segment, {})
+
+    already_present = (
+        set(sub_instance.keys()) if isinstance(sub_instance, dict) else set()
+    )
+    items = []
+
+    if "cons" in sub_schema.keys():
+        items = [lsp.CompletionItem(label=str(key)) for key in [sub_schema["cons"]]]
+
+    elif "enum" in sub_schema.keys():
+        items = [
+            lsp.CompletionItem(label=str(key)) for key in sub_schema["enum"] if key
+        ]
+
+    elif "properties" in sub_schema.keys():
+        items = [
+            lsp.CompletionItem(label=str(key))
+            for key in set(sub_schema["properties"].keys()) - already_present
+        ]
+    return items

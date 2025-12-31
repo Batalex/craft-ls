@@ -14,7 +14,8 @@ from craft_ls.core import (
     get_description_from_path,
     get_diagnostic_range,
     get_diagnostics,
-    get_schema_path_from_token_position,
+    get_exact_cursor_path,
+    get_node_path_from_token_position,
     list_symbols,
     parse_tokens,
     segmentize_nodes,
@@ -71,6 +72,7 @@ price:
 """
 
 parsed_document = parse_tokens(document)
+document_segments = segmentize_nodes(parsed_document.nodes)
 
 
 def test_get_description_first_level_ok() -> None:
@@ -112,49 +114,82 @@ def test_get_description_unknown_path(key: str) -> None:
     assert description == MISSING_DESC
 
 
-def test_get_path_from_position_first_level_ok() -> None:
+def test_get_node_path_from_position_first_level_ok() -> None:
     # Given
     # line is 2 because of initial newline after """ + comment in the document
     position = lsp.Position(2, 5)
 
     # When
-    path = get_schema_path_from_token_position(position, parsed_document.tokens)
+    path = get_node_path_from_token_position(position, dict(document_segments))
 
     # Then
-    assert path == deque(["productId"])
+    assert path == ("productId",)
 
 
-def test_get_path_from_position_nested_ok() -> None:
+def test_get_node_path_from_position_nested_ok() -> None:
     # Given
     position = lsp.Position(5, 5)
 
     # When
-    path = get_schema_path_from_token_position(position, parsed_document.tokens)
+    path = get_node_path_from_token_position(position, dict(document_segments))
 
     # Then
-    assert path == deque(["price", "amount"])
+    assert path == ("price", "amount")
 
 
-def test_get_path_from_comment_ko() -> None:
+def test_get_node_path_from_outside_ko() -> None:
     # Given
     position = lsp.Position(1, 5)  # comment line
 
     # When
-    path = get_schema_path_from_token_position(position, parsed_document.tokens)
+    path = get_node_path_from_token_position(position, dict(document_segments))
 
     # Then
     assert not path
 
 
-def test_get_path_from_empty_space_ko() -> None:
+def test_get_node_path_from_value_ok() -> None:
     # Given
     position = lsp.Position(4, 10)  # to the right of "price"
 
     # When
-    path = get_schema_path_from_token_position(position, parsed_document.tokens)
+    path = get_node_path_from_token_position(position, dict(document_segments))
 
     # Then
-    assert not path
+    assert path == ("price",)
+
+
+def test_get_cursor_path_from_token_ok() -> None:
+    # Given
+    position = lsp.Position(4, 3)  # inside "price", current path should be root
+
+    # When
+    path = get_exact_cursor_path(position, parsed_document.tokens)
+
+    # Then
+    assert path == deque([])
+
+
+def test_get_cursor_path_from_nested_key_ok() -> None:
+    # Given
+    position = lsp.Position(5, 4)  # inside "amount", current path should be "price"
+
+    # When
+    path = get_exact_cursor_path(position, parsed_document.tokens)
+
+    # Then
+    assert path == deque(["price"])
+
+
+def test_get_cursor_path_from_value_ok() -> None:
+    # Given
+    position = lsp.Position(3, 15)  # inside "bar", current path should be "productName"
+
+    # When
+    path = get_exact_cursor_path(position, parsed_document.tokens)
+
+    # Then
+    assert path == deque(["productName"])
 
 
 def test_values_are_not_flagged() -> None:

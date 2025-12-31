@@ -10,8 +10,10 @@ from pygls.lsp.server import LanguageServer
 
 from craft_ls import __version__
 from craft_ls.core import (
+    get_completion_items_from_path,
     get_description_from_path,
     get_diagnostics,
+    get_exact_cursor_path,
     get_node_path_from_token_position,
     get_validator_and_parse,
     list_symbols,
@@ -191,6 +193,32 @@ def document_symbol(
             symbols_results = list_symbols(instance, segments)
 
     return symbols_results
+
+
+@server.feature(
+    lsp.TEXT_DOCUMENT_COMPLETION, lsp.CompletionOptions(trigger_characters=[" "])
+)
+def completions(
+    ls: CraftLanguageServer, params: lsp.CompletionParams
+) -> lsp.CompletionList | None:
+    """Suggest next element based on the document structure."""
+    pos = params.position
+    uri = params.text_document.uri
+    items = []
+
+    match ls.get_or_update_index(uri):
+        case IndexEntry(validator_found, instance=instance, tokens=tokens):
+            validator = validator_found
+
+        case _:
+            return None
+
+    path = get_exact_cursor_path(pos, tokens)
+    items = get_completion_items_from_path(
+        segments=path, schema=cast(Schema, validator.schema), instance=instance
+    )
+
+    return lsp.CompletionList(is_incomplete=False, items=items)
 
 
 def start() -> None:
