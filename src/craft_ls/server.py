@@ -12,7 +12,7 @@ from craft_ls import __version__
 from craft_ls.core import (
     get_description_from_path,
     get_diagnostics,
-    get_schema_path_from_token_position,
+    get_node_path_from_token_position,
     get_validator_and_parse,
     list_symbols,
     segmentize_nodes,
@@ -141,12 +141,13 @@ def hover(ls: CraftLanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
 
     match ls.index.get(Path(uri)):
         case IndexEntry(validator_found, tokens=tokens):
+        case IndexEntry(validator_found, segments=segments):
             validator = validator_found
 
         case _:
             return None
 
-    if not (path := get_schema_path_from_token_position(position=pos, tokens=tokens)):
+    if not (path := get_node_path_from_token_position(position=pos, segments=segments)):
         return None
 
     description = get_description_from_path(
