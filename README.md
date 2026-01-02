@@ -14,11 +14,12 @@ Get on\
 
 ## Features
 
-| Feature              | Snapcraft | Rockcraft | Charmcraft[^1] |
-| :------------------- | :-------: | :-------: | :------------: |
-| Diagnostics          |    ✅     |    ✅     |       ✅       |
-| Symbol documentation |    ✅     |    ✅     |       ✅       |
-| Autocompletion       |    ❌     |    ❌     |       ❌       |
+| Feature                | Snapcraft | Rockcraft | Charmcraft[^1] |
+| :--------------------- | :-------: | :-------: | :------------: |
+| Diagnostics            |    ✅     |    ✅     |       ✅       |
+| Documentation on hover |    ✅     |    ✅     |       ✅       |
+| Symbols                |    ✅     |    ✅     |       ✅       |
+| Autocompletion         |    ✅     |    ✅     |       ✅       |
 
 https://github.com/user-attachments/assets/e4b831b5-dcac-4efd-aabb-d3040899b52b
 
