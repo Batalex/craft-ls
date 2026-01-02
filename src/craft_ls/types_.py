@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Generator, NewType
 
 from jsonschema import ValidationError, Validator
+from lsprotocol import types as lsp
 from yaml import CollectionNode, Mark, Token
 
 # We can probably do better, but that will do for now
@@ -36,13 +37,26 @@ class IncompleteParsedResult(ParsedResult):
 
 
 @dataclass
-class Node:
+class DocumentNode:
     """Document node."""
 
     value: str
     start: Mark
     end: Mark
     selection_end: Mark
+
+    def contains(self, position: lsp.Position) -> bool:
+        """Is position contained in node range?"""
+        range_start_before = self.start.line < position.line or (
+            self.start.line == position.line and self.start.column <= position.character
+        )
+
+        range_end_after = self.selection_end.line > position.line or (
+            self.selection_end.line == position.line
+            and self.selection_end.column >= position.character
+        )
+
+        return range_start_before and range_end_after
 
 
 @dataclass
@@ -52,7 +66,8 @@ class IndexEntry:
     validator: Validator
     tokens: list[Token]
     instance: YamlDocument
-    segments: dict[tuple[str, ...], Node]
+    segments: dict[tuple[str, ...], DocumentNode]
+    version: int | None
 
 
 class MissingTypeCharmcraftValidator:
