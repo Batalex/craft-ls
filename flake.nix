@@ -13,23 +13,24 @@
   }:
     utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
-      pythonPkgs = pkgs.python3Packages;
+      pythonPkgs = pkgs.python312Packages;
     in {
       packages.default = pythonPkgs.buildPythonPackage {
         pname = "craft-ls";
-        version = "0.4.0";
+        version = "0.4.1";
         format = "pyproject";
         src = ./.;
         build-system = [pythonPkgs.hatchling];
 
         dependencies = with pythonPkgs; [
           # Python dependencies
-          pygls
-          lsprotocol
+          pygls_2
+          lsprotocol_2025
           jsonschema
           pyyaml
           jsonref
           referencing
+          more-itertools
         ];
       };
 
