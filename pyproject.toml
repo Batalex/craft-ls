@@ -21,7 +21,7 @@ dependencies = [
   "referencing>=0.36.2",
   "jsonref>=1.1.0",
   "jsonpath-ng>=1.7.0",
-  "more-itertools>=10.8.0",
+  "more-itertools>=10.7.0",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",

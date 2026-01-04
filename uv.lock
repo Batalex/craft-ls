@@ -69,7 +69,7 @@ requires-dist = [
     { name = "jsonref", specifier = ">=1.1.0" },
     { name = "jsonschema", specifier = ">=4.23.0" },
     { name = "lsprotocol", specifier = ">=2025.0.0" },
-    { name = "more-itertools", specifier = ">=10.8.0" },
+    { name = "more-itertools", specifier = ">=10.7.0" },
     { name = "pygls", specifier = ">=1.1.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "referencing", specifier = ">=0.36.2" },
