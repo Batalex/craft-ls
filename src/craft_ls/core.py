@@ -18,11 +18,13 @@ from lsprotocol import types as lsp
 from more_itertools import peekable
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+from yaml.emitter import EmitterError
 from yaml.events import (
     DocumentEndEvent,
     Event,
     MappingEndEvent,
     MappingStartEvent,
+    ScalarEvent,
     SequenceEndEvent,
     SequenceStartEvent,
     StreamEndEvent,
@@ -201,7 +203,13 @@ def robust_load(instance_document: str) -> tuple[YamlDocument, list[Event]]:
     except ScannerError:
         closing_sequence.extendleft([DocumentEndEvent(), StreamEndEvent()])
 
-    truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
+    try:
+        truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
+    except EmitterError:
+        closing_sequence.append(
+            ScalarEvent(anchor=None, tag=None, implicit=(True, False), value="")
+        )
+        truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
     return cast(YamlDocument, yaml.safe_load(truncated_file)), truncated_file
 
 
