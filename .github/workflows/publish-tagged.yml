@@ -16,7 +16,7 @@ jobs:
       id-token: "write"
       contents: "read"
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: actions/checkout@v6
         with:
           ref: "${{ (inputs.tag != null) && format('refs/tags/{0}', inputs.tag) || '' }}"
       - uses: "DeterminateSystems/nix-installer-action@main"
@@ -28,9 +28,14 @@ jobs:
           include-output-paths: true
 
   snap-publish:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        system:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.system }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: snapcore/action-build@v1
         id: build
       - uses: snapcore/action-publish@v1
