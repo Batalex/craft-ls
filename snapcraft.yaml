@@ -12,6 +12,9 @@ issues:
 adopt-info: craft-ls
 base: core24
 confinement: strict
+platforms:
+  amd64:
+  arm64:
 
 parts:
   craft-ls:
