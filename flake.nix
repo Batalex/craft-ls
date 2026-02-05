@@ -17,7 +17,7 @@
     in {
       packages.default = pythonPkgs.buildPythonPackage {
         pname = "craft-ls";
-        version = "0.4.1";
+        version = "0.4.2";
         format = "pyproject";
         src = ./.;
         build-system = [pythonPkgs.hatchling];
