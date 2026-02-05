@@ -1,11 +1,17 @@
 name: craft-ls
+title: Craft Tools Language Server
 summary: A Language Server Protocol implementation for *craft files.
 description: |
   craft-ls enables editors that support the LSP to get quality of life improvements while working on *craft configuration files.
+license: BSD-3-Clause
+source-code:
+  - https://github.com/Batalex/craft-ls
+issues:
+  - https://github.com/Batalex/craft-ls/issues/new
+
+adopt-info: craft-ls
 base: core24
 confinement: strict
-adopt-info: craft-ls
-license: BSD-3-Clause
 
 parts:
   craft-ls:
