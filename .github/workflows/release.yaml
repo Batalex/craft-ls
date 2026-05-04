@@ -37,7 +37,7 @@ jobs:
           uv build
 
       - name: Store the distribution packages
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: distfiles
           path: dist/
@@ -58,7 +58,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download all the dists
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: distfiles
           path: dist/
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all the dists
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: distfiles
           path: dist/
