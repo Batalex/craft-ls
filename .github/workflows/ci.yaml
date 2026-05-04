@@ -62,7 +62,7 @@ jobs:
 
   validate_build:
     name: Build artifacts
-    need: [lint, tests]
+    needs: [lint, tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
