@@ -60,14 +60,14 @@ jobs:
       - name: Run tests
         run: nox -s tests
 
-    validate_build:
-      name: Build artifacts
-      need: [lint, tests]
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v6
-        - uses: snapcore/action-build@v1
-          name: Build snap
-        - uses: "DeterminateSystems/nix-installer-action@main"
-        - run: nix build
-          name: Build Flake
+  validate_build:
+    name: Build artifacts
+    need: [lint, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: snapcore/action-build@v1
+        name: Build snap
+      - uses: "DeterminateSystems/nix-installer-action@main"
+      - run: nix build
+        name: Build Flake
