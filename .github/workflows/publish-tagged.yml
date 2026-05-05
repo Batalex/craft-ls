@@ -9,12 +9,16 @@ on:
         description: "The existing tag to publish"
         type: "string"
         required: true
+
+permissions:
+  contents: read
+
 jobs:
   flakehub-publish:
     runs-on: "ubuntu-latest"
     permissions:
-      id-token: "write"
-      contents: "read"
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
