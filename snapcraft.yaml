@@ -18,12 +18,11 @@ platforms:
 
 parts:
   craft-ls:
-    plugin: python
+    plugin: uv
     source: .
     build-snaps:
       - astral-uv
     override-build: |
-      uv export --format requirements-txt --no-dev -o requirements.txt
       craftctl set version="$(cat src/craft_ls/__init__.py | cut -d '"' -f2 | xargs)"
       craftctl default
     stage-packages:
