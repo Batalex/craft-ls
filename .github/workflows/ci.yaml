@@ -66,8 +66,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: snapcore/action-build@v1
-        name: Build snap
+
+      - name: Build snap
+        uses: snapcore/action-build@v1
+
+      - name: Execute snap
+        run: |
+          sudo snap install $(find . -type f -name '*.snap') --dangerous
+          snap run craft-ls --version
+
       - uses: "DeterminateSystems/nix-installer-action@main"
-      - run: nix build
-        name: Build Flake
+
+      - name: Build Flake
+        run: nix build
+
+      - name: Execute flake
+        run: ./result/bin/craft-ls --version
