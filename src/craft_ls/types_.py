@@ -88,6 +88,9 @@ class MissingTypeCharmcraftValidator:
         )
 
 
+MISSING_TYPE_MSG = "Missing or unsupported 'base' and/or 'build-base' key(s)."
+
+
 class MissingTypeSnapcraftValidator:
     """No op implementation.
 
@@ -103,6 +106,6 @@ class MissingTypeSnapcraftValidator:
         yield ValidationError(
             validator="required",
             path=deque([]),
-            message="Missing or unsupported 'base' and/or 'build-base' key(s).",
+            message=MISSING_TYPE_MSG,
             schema={},
         )
