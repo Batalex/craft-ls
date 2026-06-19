@@ -113,6 +113,12 @@ def get_validator_and_parse(  # noqa: C901
                     .lookup("urn:snapcraft:core24")
                     .contents
                 )
+            case "core26", _:
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:core26")
+                    .contents
+                )
             case "bare", "core22":
                 validator = Draft202012Validator(
                     schema=snapcraft_registry.resolver()
@@ -123,6 +129,12 @@ def get_validator_and_parse(  # noqa: C901
                 validator = Draft202012Validator(
                     schema=snapcraft_registry.resolver()
                     .lookup("urn:snapcraft:bare24")
+                    .contents
+                )
+            case "bare", "core26":
+                validator = Draft202012Validator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:bare26")
                     .contents
                 )
             case _, "core22":
@@ -140,7 +152,7 @@ def get_validator_and_parse(  # noqa: C901
             case _, "devel":
                 validator = Draft202012Validator(
                     schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:devel")
+                    .lookup("urn:snapcraft:basedevel")
                     .contents
                 )
 
