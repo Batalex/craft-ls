@@ -88,10 +88,15 @@ class MissingTypeCharmcraftValidator:
         )
 
 
+MISSING_TYPE_MSG = "Missing or unsupported 'base' and/or 'build-base' key(s)."
+
+
 class MissingTypeSnapcraftValidator:
     """No op implementation.
 
-    Used if snapcraft.yaml is missing the 'base' or 'build-base' key.
+    Used if snapcraft.yaml is:
+    - missing the 'base' or 'build-base' key
+    - using an unsupported base
     """
 
     def iter_errors(
@@ -101,6 +106,6 @@ class MissingTypeSnapcraftValidator:
         yield ValidationError(
             validator="required",
             path=deque([]),
-            message="Filling 'base' and/or 'build-base' key(s) is mandatory.",
+            message=MISSING_TYPE_MSG,
             schema={},
         )

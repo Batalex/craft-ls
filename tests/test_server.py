@@ -6,6 +6,8 @@ import pytest_lsp
 from lsprotocol import types
 from pytest_lsp import ClientServerConfig, LanguageClient
 
+from craft_ls.types_ import MISSING_TYPE_MSG
+
 
 @pytest_lsp.fixture(
     config=ClientServerConfig(
@@ -52,4 +54,4 @@ async def test_diagnostic_on_open(client: LanguageClient):
 
     # Then
     assert (diagnostics := client.diagnostics.get(test_uri, []))
-    assert any("is mandatory" in diagnostic.message for diagnostic in diagnostics)
+    assert any(MISSING_TYPE_MSG in diagnostic.message for diagnostic in diagnostics)
