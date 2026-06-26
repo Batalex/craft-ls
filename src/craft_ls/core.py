@@ -1,64 +1,41 @@
-"""Parser-validator core logic."""
+"""Core logic for crafting LS responses."""
 
 import logging
 import re
-from collections import deque
 from importlib.resources import files
-from itertools import chain
-from typing import Iterable, cast
+from typing import Any, Iterable, cast
 
 import jsonref
-import yaml
-from jsonpath_ng import parse
+import lsprotocol.types as lsp
+from jsonpath_ng import parse as jq  # zuban: ignore[attr-defined]
 from jsonschema import Draft202012Validator, ValidationError
 from jsonschema.exceptions import relevance
 from jsonschema.protocols import Validator
 from jsonschema.validators import validator_for
-from lsprotocol import types as lsp
-from more_itertools import peekable
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
-from yaml.emitter import EmitterError
-from yaml.events import (
-    DocumentEndEvent,
-    Event,
-    MappingEndEvent,
-    MappingStartEvent,
-    ScalarEvent,
-    SequenceEndEvent,
-    SequenceStartEvent,
-    StreamEndEvent,
-)
-from yaml.scanner import ScannerError
-from yaml.tokens import (
-    BlockEndToken,
-    BlockMappingStartToken,
-    BlockSequenceStartToken,
-    KeyToken,
-    ScalarToken,
-    Token,
-    ValueToken,
-)
+from tree_sitter import Node, Tree
 
+from craft_ls.helpers import sanatize_key
+from craft_ls.parser import (
+    query_charm_type_keys,
+    query_pairs,
+    query_snap_base_keys,
+)
 from craft_ls.types_ import (
-    CompleteParsedResult,
-    DocumentNode,
-    IncompleteParsedResult,
     MissingTypeCharmcraftValidator,
     MissingTypeSnapcraftValidator,
-    ParsedResult,
     Schema,
-    YamlDocument,
 )
 
 SOURCE = "craft-ls"
 FILE_TYPES = ["snapcraft", "rockcraft", "charmcraft"]
 MISSING_DESC = "No description to display"
+SPECIAL_SYMBOL_PARENTS = {"parts", "apps", "services"}
 DEFAULT_RANGE = lsp.Range(
     start=lsp.Position(line=0, character=0),
     end=lsp.Position(line=0, character=0),
 )
-SPECIAL_SYMBOL_PARENTS = {"parts", "apps", "services"}
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +46,7 @@ for file_type in FILE_TYPES:
     schema = jsonref.loads(
         files("craft_ls.schemas").joinpath(f"{file_type}.json").read_text()
     )
-    default_validators[file_type] = validator_for(schema)(schema)
+    default_validators[file_type] = validator_for(schema)(schema)  # type: ignore
 
     if file_type == "charmcraft":
         schema = Resource.from_contents(
@@ -84,222 +61,156 @@ for file_type in FILE_TYPES:
         snapcraft_registry = schema @ Registry()
 
 
-def get_validator_and_parse(  # noqa: C901
-    file_stem: str, instance_document: str
-) -> tuple[Validator, ParsedResult] | None:
+def get_snap_bases(tree: Tree) -> tuple[str | None, str | None]:
+    """Get the snapcraft base and build-base keys and values."""
+    matches = query_snap_base_keys.matches(tree.root_node)
+    bases = {}
+
+    for _, captures in matches:
+        k_nodes = captures.get("key_node", [])
+        v_nodes = captures.get("value_node", [])
+
+        k_node = k_nodes[0] if k_nodes else None
+        v_node = v_nodes[0] if v_nodes else None
+
+        if (
+            not k_node
+            or not v_node
+            or not k_node.text
+            or not v_node.text
+            # The base keys are only at depth=0 of the yaml doc
+            or k_node.start_point.column != 0
+        ):
+            continue
+
+        key_name = k_node.text.decode("utf-8").strip()
+        bases[key_name] = v_node.text.decode("utf-8").strip()
+
+    return bases.get("base", None), bases.get("build-base", None)
+
+
+def get_charm_type(tree: Tree) -> str | None:
+    """Get the charmcraft type key and value."""
+    matches = query_charm_type_keys.matches(tree.root_node)
+    charm_type: str | None = None
+
+    for _, captures in matches:
+        k_nodes = captures.get("key_node", [])
+        v_nodes = captures.get("value_node", [])
+
+        k_node = k_nodes[0] if k_nodes else None
+        v_node = v_nodes[0] if v_nodes else None
+
+        if (
+            not k_node
+            or not v_node
+            or not v_node.text
+            # The base keys are only at depth=0 of the yaml doc
+            or k_node.start_point.column != 0
+        ):
+            continue
+
+        charm_type = v_node.text.decode("utf-8").strip()
+
+    return charm_type
+
+
+def get_snapcraft_validator(tree: Tree) -> Validator:
+    """Get the most appropriate snapcraft validator for the current document."""
+    validator: Draft202012Validator | MissingTypeSnapcraftValidator
+    match get_snap_bases(tree):
+        case "core22", _:
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:core22")
+                .contents
+            )
+        case "core24", _:
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:core24")
+                .contents
+            )
+        case "core26", _:
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:core26")
+                .contents
+            )
+        case "bare", "core22":
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:bare22")
+                .contents
+            )
+        case "bare", "core24":
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:bare24")
+                .contents
+            )
+        case "bare", "core26":
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:bare26")
+                .contents
+            )
+        case _, "core22":
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:base22")
+                .contents
+            )
+        case _, "core24":
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:base24")
+                .contents
+            )
+        case _, "devel":
+            validator = Draft202012Validator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:basedevel")
+                .contents
+            )
+
+        case _:
+            validator = MissingTypeSnapcraftValidator()
+
+    return cast(Validator, validator)
+
+
+def get_validator_from_tree(file_stem: str, tree: Tree) -> Validator | None:
     """Get the most appropriate validator for the current document."""
     if file_stem not in FILE_TYPES:
         return None
 
-    scanned_tokens = parse_tokens(instance_document)
-
     if file_stem == "rockcraft":
-        return default_validators[file_stem], scanned_tokens
+        return default_validators[file_stem]
 
     elif file_stem == "snapcraft":
-        base = scanned_tokens.instance.get("base", None)
-        build_base = scanned_tokens.instance.get("build-base", None)
-        validator: Draft202012Validator | MissingTypeSnapcraftValidator
-        match base, build_base:
-            case "core22", _:
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:core22")
-                    .contents
-                )
-            case "core24", _:
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:core24")
-                    .contents
-                )
-            case "core26", _:
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:core26")
-                    .contents
-                )
-            case "bare", "core22":
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:bare22")
-                    .contents
-                )
-            case "bare", "core24":
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:bare24")
-                    .contents
-                )
-            case "bare", "core26":
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:bare26")
-                    .contents
-                )
-            case _, "core22":
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:base22")
-                    .contents
-                )
-            case _, "core24":
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:base24")
-                    .contents
-                )
-            case _, "devel":
-                validator = Draft202012Validator(
-                    schema=snapcraft_registry.resolver()
-                    .lookup("urn:snapcraft:basedevel")
-                    .contents
-                )
-
-            case _:
-                validator = MissingTypeSnapcraftValidator()
-
-        return cast(Validator, validator), scanned_tokens
+        validator = get_snapcraft_validator(tree)
 
     else:
         # by elimination, file_stem is charmcraft
-        if scanned_tokens.instance.get("type") != "charm":
-            return cast(Validator, MissingTypeCharmcraftValidator()), scanned_tokens
+        if get_charm_type(tree) != "charm":
+            return cast(Validator, MissingTypeCharmcraftValidator())
 
-        validator = Draft202012Validator(
-            schema=charmcraft_registry.resolver()
-            .lookup("urn:charmcraft:platformcharm")
-            .contents
+        validator = cast(
+            Validator,
+            Draft202012Validator(
+                schema=charmcraft_registry.resolver()
+                .lookup("urn:charmcraft:platformcharm")
+                .contents
+            ),
         )
-    return cast(Validator, validator), scanned_tokens
-
-
-def parse_tokens(instance_document: str) -> ParsedResult:
-    """Scan the document for yaml tokens."""
-    tokens = []
-    tokens_iter = yaml.scan(instance_document)
-
-    try:
-        for event in tokens_iter:
-            tokens.append(event)
-    except ScannerError:
-        instance, events = robust_load(instance_document)
-        nodes = yaml.compose(events)
-        return IncompleteParsedResult(tokens=tokens, instance=instance, nodes=nodes)
-
-    instance = cast(YamlDocument, yaml.safe_load(instance_document))
-    nodes = yaml.compose(instance_document)
-    return CompleteParsedResult(tokens=tokens, instance=instance, nodes=nodes)
-
-
-def robust_load(instance_document: str) -> tuple[YamlDocument, list[Event]]:
-    """Parse the valid portion of the stream and construct a Python object."""
-    events = []
-    events_iter = yaml.parse(instance_document)
-
-    closing_sequence: deque[Event] = deque()
-
-    try:
-        for event in events_iter:
-            match event:
-                case MappingStartEvent():
-                    closing_sequence.append(MappingEndEvent())
-                case SequenceStartEvent():
-                    closing_sequence.append(SequenceEndEvent())
-                case MappingEndEvent():
-                    closing_sequence.pop()
-                case SequenceEndEvent():
-                    closing_sequence.pop()
-
-            events.append(event)
-    except ScannerError:
-        closing_sequence.extendleft([DocumentEndEvent(), StreamEndEvent()])
-
-    try:
-        truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
-    except EmitterError:
-        closing_sequence.append(
-            ScalarEvent(anchor=None, tag=None, implicit=(True, False), value="")
-        )
-        truncated_file = yaml.emit(events + list(reversed(closing_sequence)))
-    return cast(YamlDocument, yaml.safe_load(truncated_file)), truncated_file
-
-
-def segmentize_nodes(
-    root: yaml.CollectionNode,
-) -> list[tuple[tuple[str, ...], DocumentNode]]:
-    """Flatten graph into path segments."""
-    segments: list[tuple[tuple[str, ...], DocumentNode]] = []
-    nodes = list(root.value)
-
-    for node_pair in nodes:
-        segments.extend(_do_segmentize_nodes(*node_pair))
-
-    return segments
-
-
-def _do_segmentize_nodes(
-    first: yaml.CollectionNode,
-    second: yaml.CollectionNode,
-    prefix: tuple[str, ...] | None = None,
-) -> list[tuple[tuple[str, ...], DocumentNode]]:
-    """Recursive node segmentation.
-
-    Craft tools don't usually go over three levels, so we don't have to worry about recursion limits.
-    """
-    segments = []
-    prefix = prefix or ()
-
-    match second:
-        case yaml.ScalarNode(end_mark=selection_end):
-            current_node = DocumentNode(
-                value=first.value,
-                start=first.start_mark,
-                end=first.end_mark,
-                selection_end=selection_end,
-            )
-            segments.append((prefix + (str(first.value),), current_node))
-
-        case yaml.MappingNode(end_mark=selection_end, value=children):
-            current_node = DocumentNode(
-                value=first.value,
-                start=first.start_mark,
-                end=first.end_mark,
-                selection_end=selection_end,
-            )
-            segments.append((prefix + (str(first.value),), current_node))
-            segments.extend(
-                list(
-                    chain.from_iterable(
-                        [
-                            _do_segmentize_nodes(
-                                child[0], child[1], prefix=prefix + (str(first.value),)
-                            )
-                            for child in children
-                        ]
-                    )
-                )
-            )
-
-        case yaml.SequenceNode(end_mark=selection_end):
-            print(selection_end.line)
-            current_node = DocumentNode(
-                value=first.value,
-                start=first.start_mark,
-                end=first.end_mark,
-                selection_end=selection_end,
-            )
-            segments.append((prefix + (str(first.value),), current_node))
-        case other:
-            logger.error(other)
-
-    return segments
+    return validator
 
 
 def get_diagnostics(
+    tree: Tree,
     validator: Validator,
-    instance: YamlDocument,
-    segments: dict[tuple[str, ...], DocumentNode],
+    instance: Any,
 ) -> list[lsp.Diagnostic]:
     """Validate a document against its schema."""
     diagnostics = []
@@ -307,7 +218,6 @@ def get_diagnostics(
     for error in validator.iter_errors(instance):
         if error.context:
             error = sorted(error.context, key=relevance)[0]
-
         match error:
             case ValidationError(
                 validator="additionalProperties", absolute_path=path, message=message
@@ -319,7 +229,7 @@ def get_diagnostics(
                 ):
                     keys_cleaned = [key.strip(" '") for key in keys.split(",")]
                     ranges = [
-                        get_diagnostic_range(segments, list(path) + [key])
+                        get_diagnostic_range(tree, cast(list[str], list(path)) + [key])
                         for key in keys_cleaned
                     ]
 
@@ -340,13 +250,15 @@ def get_diagnostics(
             ):
                 pattern = "'(?P<key>.*)' key is mandatory"
                 if path:
-                    range_ = get_diagnostic_range(segments, path)
+                    range_ = get_diagnostic_range(tree, cast(list[str], list(path)))
                 elif (match := re.search(pattern, message or "")) and (
                     key := match.group("key")
                 ):
-                    # Const errore can be wrongfully handled here with an empty path,
+                    # Const errors can be wrongfully handled here with an empty path,
                     # so we try to handle those cases gracefully
-                    range_ = get_diagnostic_range(segments, list(path) + [key])
+                    range_ = get_diagnostic_range(
+                        tree, cast(list[str], list(path)) + [key]
+                    )
                 else:
                     range_ = DEFAULT_RANGE
 
@@ -361,7 +273,7 @@ def get_diagnostics(
 
             case ValidationError(absolute_path=path, message=str(message)):
                 path = cast(list[str], path)
-                range_ = get_diagnostic_range(segments, path) if path else DEFAULT_RANGE
+                range_ = get_diagnostic_range(tree, path) if path else DEFAULT_RANGE
 
                 diagnostics.append(
                     lsp.Diagnostic(
@@ -379,32 +291,140 @@ def get_diagnostics(
     return diagnostics
 
 
-def get_diagnostic_range(
-    document_segments: dict[tuple[str, ...], DocumentNode], diag_segments: Iterable[str]
-) -> lsp.Range:
+def get_diagnostic_range(tree: Tree, diag_segments: Iterable[str]) -> lsp.Range:
     """Link the validation error to the position in the original document."""
-    if (
-        not diag_segments
-        or (error_node := document_segments.get(tuple(diag_segments))) is None
-    ):
+    segments = list(diag_segments)
+    if not segments:
         return DEFAULT_RANGE
 
-    range = lsp.Range(
-        start=lsp.Position(
-            line=error_node.start.line,
-            character=error_node.start.column,
+    segment_idx = 0
+    stack = [tree.root_node]
+
+    while stack and segment_idx < len(segments):
+        current = stack.pop()
+        target = segments[segment_idx]
+
+        if current.type in ("block_mapping_pair", "flow_pair"):
+            k = current.child_by_field_name("key")
+            if k and k.text and k.text.decode("utf-8").strip() == target:
+                segment_idx += 1
+
+                # Early exit if this was the last segment
+                if segment_idx == len(segments):
+                    return lsp.Range(
+                        start=lsp.Position(k.start_point.row, k.start_point.column),
+                        end=lsp.Position(k.end_point.row, k.end_point.column),
+                    )
+
+                # Then continue the descent in this value subtree
+                v = current.child_by_field_name("value")
+                stack = [v] if v else []
+
+            # Wrong subtree, continue horizontally
+            continue
+
+        if current.children:
+            stack.extend(reversed(current.children))
+
+    return DEFAULT_RANGE
+
+
+def get_immediate_child_pairs(node: Node) -> list[Node]:
+    """Get the key value pairs that are the level just below a given node."""
+    captures = query_pairs.captures(node)
+
+    if not (pairs := captures.get("pair", [])):
+        return pairs
+
+    # Quite the hack, but I like it
+    # Immediate children are left aligned on the same col, because yaml is indent based
+    min_column = min(p.start_point.column for p in pairs)
+    return [p for p in pairs if p.start_point.column == min_column]
+
+
+def create_symbol(pair: Node) -> lsp.DocumentSymbol | None:
+    """Convert a tree-sitter pair node or loose scalar key into an LSP DocumentSymbol."""
+    key = pair.child_by_field_name("key")
+    value = pair.child_by_field_name("value")
+    end_node = pair
+
+    if not key or not key.text:
+        return None
+
+    name = key.text.decode("utf-8").strip()
+    if not name or name.startswith(("-", "---", "...")):
+        return None
+
+    symbol = lsp.DocumentSymbol(
+        name=name,
+        kind=lsp.SymbolKind.Key,
+        range=lsp.Range(
+            start=lsp.Position(key.start_point.row, key.start_point.column),
+            end=lsp.Position(end_node.end_point.row, end_node.end_point.column),
         ),
-        end=lsp.Position(
-            line=error_node.selection_end.line,
-            character=error_node.selection_end.column,
+        selection_range=lsp.Range(
+            start=lsp.Position(key.start_point.row, key.start_point.column),
+            end=lsp.Position(key.end_point.row, key.end_point.column),
         ),
     )
-    return range
+
+    if name in SPECIAL_SYMBOL_PARENTS and value:
+        children_symbols = []
+        for child_pair in get_immediate_child_pairs(value):
+            if child_symbol := create_symbol(child_pair):
+                children_symbols.append(child_symbol)
+
+        if children_symbols:
+            symbol.children = sorted(children_symbols, key=lambda s: s.range.start.line)
+
+    return symbol
 
 
-def sanatize_key(key: str) -> str:
-    """Sanatize key."""
-    return re.sub(r"""['"\\*]""", "", key)
+def list_symbols(tree: Tree) -> list[lsp.DocumentSymbol]:
+    """List first-level keys and expands special parent to get the second level.
+
+    Simply put, we are only interested in keys up to the second level at most, and only
+    for things like parts, apps, etc.
+    """
+    symbols = []
+    for child_pair in get_immediate_child_pairs(tree.root_node):
+        child_symbol = create_symbol(child_pair)
+        if child_symbol:
+            symbols.append(child_symbol)
+
+    return sorted(symbols, key=lambda s: s.range.start.line)
+
+
+def get_node_path_from_token_position(
+    tree: Tree, position: lsp.Position
+) -> tuple[str, ...] | None:
+    """Finds the innermost key path tracking down to the current cursor position.
+
+    To do so, we actually proceed the other way around. We start from the node itself
+    and navigate through its ancestors.
+    """
+    point = (position.line, position.character)
+    leaf = tree.root_node.descendant_for_point_range(point, point)
+    if not leaf:
+        return None
+
+    path: list[str] = []
+    curr = leaf
+
+    while curr:
+        if curr.type in ("block_mapping_pair", "flow_pair"):
+            k = curr.child_by_field_name("key")
+            if k and k.text:
+                k_str = k.text.decode("utf-8").strip()
+                if k_str and not k_str.startswith(("-", "---", "...")):
+                    path.append(k_str)
+
+        if (parent := curr.parent) is None:
+            break
+
+        curr = parent
+
+    return tuple(reversed(path)) if path else None
 
 
 def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
@@ -422,7 +442,7 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
         )
         query = f"{query}..{sub_query}"
     query = f"{query}.description|title"
-    parser = parse(query)
+    parser = jq(query)
     candidates = parser.find(schema)
 
     if candidates:
@@ -431,122 +451,61 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
         return MISSING_DESC
 
 
-def get_exact_cursor_path(position: lsp.Position, tokens: list[Token]) -> deque[str]:  # noqa: C901
-    """Get the exact path to the cursor position."""
-    current_path: deque[str] = deque()
-    iterator = peekable(tokens)
-    last_scalar_token: str = ""
-    previous: Token | None = None
-    token: Token | None = None
-    next_token: Token | None = None
+def get_completion_path(
+    tree: Tree, document_text: str, position: lsp.Position
+) -> list[str]:
+    """Finds the YAML key path at the cursor position for autocompletion.
 
-    for token in iterator:
-        next_token = iterator.peek(None)
-        early_stop = (
-            not next_token
-            or next_token.start_mark.line > position.line
-            or (
-                next_token.start_mark.line >= position.line
-                and next_token.start_mark.column >= position.character
-            )
-        )
-        if early_stop:
-            break
-
-        match token:
-            case BlockMappingStartToken() | BlockSequenceStartToken():
-                if last_scalar_token:
-                    current_path.append(last_scalar_token)
-            case BlockEndToken():
-                if current_path:
-                    current_path.pop()
-
-            case KeyToken():
-                last_scalar_token = ""
-
-            case ScalarToken(value=value):
-                if isinstance(previous, yaml.KeyToken):
-                    last_scalar_token = value
-
-        previous = token
-
-    if (
-        isinstance(token, (ValueToken, ScalarToken))
-        and last_scalar_token
-        and next_token
-    ):
-        current_path.append(last_scalar_token)
-
-    return current_path
-
-
-def get_node_path_from_token_position(
-    position: lsp.Position, segments: dict[tuple[str, ...], DocumentNode]
-) -> tuple[str, ...] | None:
-    """Find the innermost node path corresponding to the current position."""
-    for segment, node in reversed(segments.items()):
-        if node.contains(position):
-            return segment
-
-    return None
-
-
-def list_symbols(
-    instance: YamlDocument, segments: dict[tuple[str, ...], DocumentNode]
-) -> list[lsp.DocumentSymbol]:
-    """List document symbols.
-
-    We are only interested in keys up to the second level at most, so we don't need anything
-    fancy here.
+    We need to be more precise than for the hovering and know exactly if the user is typing
+    a key or a value.
     """
-    symbols = []
-    for top_level_key in instance.keys():
-        node = segments[(top_level_key,)]
-        symbol = lsp.DocumentSymbol(
-            name=node.value,
-            kind=lsp.SymbolKind.Key,
-            range=lsp.Range(
-                start=lsp.Position(node.start.line, node.start.column),
-                end=lsp.Position(node.end.line, node.end.column),
-            ),
-            selection_range=lsp.Range(
-                start=lsp.Position(node.start.line, node.start.column),
-                end=lsp.Position(node.selection_end.line, node.selection_end.column),
-            ),
-        )
-        if top_level_key in SPECIAL_SYMBOL_PARENTS:
-            children_symbols = []
-            for second_level_key in instance[top_level_key].keys():
-                child_node = segments[(top_level_key, second_level_key)]
-                child_symbol = lsp.DocumentSymbol(
-                    name=child_node.value,
-                    kind=lsp.SymbolKind.Key,
-                    range=lsp.Range(
-                        start=lsp.Position(
-                            child_node.start.line, child_node.start.column
-                        ),
-                        end=lsp.Position(child_node.end.line, child_node.end.column),
-                    ),
-                    selection_range=lsp.Range(
-                        start=lsp.Position(
-                            child_node.start.line, child_node.start.column
-                        ),
-                        end=lsp.Position(
-                            child_node.selection_end.line,
-                            child_node.selection_end.column,
-                        ),
-                    ),
-                )
-                children_symbols.append(child_symbol)
+    lines = document_text.splitlines()
+    prefix = (
+        lines[position.line][: position.character] if position.line < len(lines) else ""
+    )
+    current_indent = len(prefix) - len(prefix.lstrip())
 
-            symbol.children = children_symbols
-        symbols.append(symbol)
+    keys_above: list[tuple[int, str]] = []
+    stack = [tree.root_node] if tree and tree.root_node else []
 
-    return symbols
+    while stack:
+        node = stack.pop()
+
+        if node.type in ("block_mapping_pair", "flow_pair"):
+            key_node = node.child_by_field_name("key")
+
+            # Quite intuitively, yaml is written left to right, top to bottom
+            # Therefore, valid "ancestors" keys must be above the position
+            if key_node and key_node.start_point.row < position.line and key_node.text:
+                key_str = key_node.text.decode().strip()
+
+                if key_str and not key_str.startswith(("-", "---", "...")):
+                    col = key_node.start_point.column
+
+                    # drop sibling keys or keys from closed blocks
+                    while keys_above and keys_above[-1][0] >= col:
+                        keys_above.pop()
+                    keys_above.append((col, key_str))
+
+        if node.children:
+            stack.extend(reversed(node.children))
+
+    # Remove keys that are as deep or deeper than our current indentation
+    while keys_above and keys_above[-1][0] >= current_indent:
+        keys_above.pop()
+
+    path = [key_name for _, key_name in keys_above]
+
+    # If the user is typing a value, then we add the current key to the path so
+    # that we can check enums etc. in the schema.
+    if ":" in prefix and (current_key := prefix.split(":")[0].strip()):
+        path.append(current_key)
+
+    return path
 
 
 def get_completion_items_from_path(
-    segments: Iterable[str], schema: Schema, instance: YamlDocument
+    segments: Iterable[str], schema: Schema, instance: Any
 ) -> list[lsp.CompletionItem]:
     """Get possible values for children nodes or enum values."""
     sub_instance = instance

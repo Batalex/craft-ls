@@ -44,7 +44,7 @@ def lint(session: nox.Session) -> None:
     )
     session.run("ruff", "check", "--fix", "src")
     session.run("ruff", "check", "--fix", "tests")
-    session.run("mypy", "src")
+    session.run("zuban", "mypy", "src")
 
 
 @nox.session()

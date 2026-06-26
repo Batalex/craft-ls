@@ -14,14 +14,15 @@ keywords = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-  "pygls>=1.1.0",
+  "pygls>=2.1.1",
   "lsprotocol>=2025.0.0",
-  "jsonschema>=4.23.0",
+  "jsonschema>=4.26.0",
   "pyyaml>=6.0.2",
   "referencing>=0.36.2",
   "jsonref>=1.1.0",
   "jsonpath-ng>=1.7.0",
-  "more-itertools>=10.7.0",
+  "tree-sitter>=0.25.2",
+  "tree-sitter-yaml>=0.7.2",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -44,7 +45,7 @@ fmt = [
 ]
 lint = [
   "ruff >=0.15.12,<0.16.0",
-  "mypy >= 1.14.0",
+  "zuban >= 0.9.0",
   "types-pyyaml",
   "types-jsonschema",
 ]
@@ -94,15 +95,8 @@ known-first-party = ["craft_ls"]
 [tool.mypy]
 strict = true
 
-[[tool.mypy.overrides]]
-module = [
-  "jsonref",
-  "jsonpath_ng"
-]
-ignore_missing_imports = true
-
 [tool.pyright]
-enableReachabilityAnalysis = false  # unreliable
+enableReachabilityAnalysis = false # unreliable
 
 [tool.pytest]
 log_cli_level = "INFO"

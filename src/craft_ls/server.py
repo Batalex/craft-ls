@@ -1,9 +1,10 @@
 """Define the language server features."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from textwrap import shorten
-from typing import cast
+from typing import Iterable, cast
 
 from lsprotocol import types as lsp
 from pygls.lsp.server import LanguageServer
@@ -11,18 +12,21 @@ from pygls.lsp.server import LanguageServer
 from craft_ls import __version__
 from craft_ls.core import (
     get_completion_items_from_path,
+    get_completion_path,
     get_description_from_path,
     get_diagnostics,
-    get_exact_cursor_path,
     get_node_path_from_token_position,
-    get_validator_and_parse,
+    get_validator_from_tree,
     list_symbols,
-    segmentize_nodes,
+)
+from craft_ls.helpers import shorten_diagnostics_messages
+from craft_ls.parser import (
+    apply_change_to_tree_and_text,
+    parser,
+    yaml_tree_to_dict,
 )
 from craft_ls.settings import IS_DEV_MODE
-from craft_ls.types_ import IndexEntry, ParsedResult, Schema
-
-MSG_SIZE = 79
+from craft_ls.types_ import DocumentsIndex, IndexEntry, Schema, YamlDocument
 
 logger = logging.getLogger(__name__)
 
@@ -30,52 +34,72 @@ logger = logging.getLogger(__name__)
 class CraftLanguageServer(LanguageServer):
     """*craft tools language server."""
 
-    def __init__(
-        self,
-        name: str,
-        version: str,
-        text_document_sync_kind: lsp.TextDocumentSyncKind = lsp.TextDocumentSyncKind.Incremental,
-        notebook_document_sync: lsp.NotebookDocumentSyncOptions | None = None,
-    ) -> None:
+    def __init__(self, name: str, version: str) -> None:
         super().__init__(
-            name,
-            version,
-            text_document_sync_kind,
-            notebook_document_sync,
+            name=name,
+            version=version,
+            text_document_sync_kind=lsp.TextDocumentSyncKind.Incremental,
         )
-        self.index: dict[str, IndexEntry | None] = {}
+        self.documents_index: DocumentsIndex = {}
 
-    def parse_file(self, file_uri: str) -> IndexEntry | None:
-        """Parse a document into tokens, nodes and whatnot.
+    def parse_document(
+        self,
+        file_uri: str,
+        content_changes: Iterable[lsp.TextDocumentContentChangeEvent] | None = None,
+    ) -> IndexEntry:
+        """Parse a document.
 
-        The result is cached so we can access it in endpoints.
+        The result is cached so we can access it various LS endpoints.
         """
         document = self.workspace.get_text_document(file_uri)
-        match get_validator_and_parse(Path(file_uri).stem, document.source):
-            case None:
-                self.index[file_uri] = None
+        cached = self.documents_index.get(file_uri)
 
-            case validator, ParsedResult(tokens, instance, nodes):
-                segments_nodes = segmentize_nodes(nodes)
-                self.index[file_uri] = IndexEntry(
-                    validator, tokens, instance, dict(segments_nodes), document.version
+        tree = None
+        current_text = document.source
+
+        # Update tree in-place to not re-parse the entire document
+        if cached and content_changes:
+            old_tree, _, _, old_text, _ = cached
+            tree = old_tree
+
+            full_reparse_required = False
+            for change in content_changes:
+                if getattr(change, "range", None) is None:
+                    full_reparse_required = True
+                    break
+
+                tree, current_text = apply_change_to_tree_and_text(
+                    tree,
+                    old_text,
+                    cast(lsp.TextDocumentContentChangePartial, change),
+                    document.position_codec,
                 )
 
-        return self.index[file_uri]
+            if full_reparse_required or tree is not None:
+                tree = parser.parse(current_text.encode("utf-8"), old_tree=tree)
 
-    def get_or_update_index(self, file_uri: str) -> IndexEntry | None:
-        """Re-parse document if needed."""
-        current_version = self.workspace.get_text_document(file_uri).version
-        entry = self.index.get(file_uri)
-        match entry:
-            case IndexEntry(version=cached_version) as cached:
-                if not cached_version or cached_version != current_version:
-                    return self.parse_file(
-                        file_uri,
-                    )
-                return cached
-            case None:
-                return None
+        if tree is None:
+            # If the in-place upgrade failed for any reason, we fall back to re-parsing
+            # the entire document.
+            current_text = document.source
+            tree = parser.parse(document.source.encode("utf-8"))
+
+        validator = get_validator_from_tree(Path(file_uri).stem, tree)
+        instance = cast(YamlDocument, yaml_tree_to_dict(tree))
+        self.documents_index[file_uri] = IndexEntry(
+            tree,
+            validator,
+            instance,
+            current_text,
+            document.version,
+        )
+        return IndexEntry(
+            tree,
+            validator,
+            instance,
+            current_text,
+            document.version,
+        )
 
 
 server = CraftLanguageServer(
@@ -84,15 +108,9 @@ server = CraftLanguageServer(
 )
 
 
-def shorten_messages(diagnostics: list[lsp.Diagnostic]) -> None:
-    """Shorten diagnostics messages to better fit an editor view."""
-    for diagnostic in diagnostics:
-        diagnostic.message = shorten(diagnostic.message, MSG_SIZE)
-
-
 @server.feature(lsp.TEXT_DOCUMENT_DID_OPEN)
 def on_opened(ls: CraftLanguageServer, params: lsp.DidOpenTextDocumentParams) -> None:
-    """Parse each document when it is opened."""
+    """Parse a document when it is first opened."""
     uri = params.text_document.uri
     diagnostics = (
         [
@@ -108,60 +126,61 @@ def on_opened(ls: CraftLanguageServer, params: lsp.DidOpenTextDocumentParams) ->
         if IS_DEV_MODE
         else []
     )
-
-    match ls.parse_file(uri):
-        case IndexEntry(
-            validator, instance=instance, segments=segments, version=version
-        ):
-            diagnostics.extend(get_diagnostics(validator, instance, segments))
-
-        case _:
-            return
-
-    shorten_messages(diagnostics)
-    if diagnostics:
-        server.text_document_publish_diagnostics(
-            lsp.PublishDiagnosticsParams(
-                uri=uri, version=version, diagnostics=diagnostics
-            )
+    tree, validator, instance, _, version = ls.parse_document(params.text_document.uri)
+    if validator:
+        diagnostics.extend(get_diagnostics(tree, validator, instance))
+    shorten_diagnostics_messages(diagnostics)
+    server.text_document_publish_diagnostics(
+        lsp.PublishDiagnosticsParams(
+            uri=uri,
+            version=version,
+            diagnostics=diagnostics,
         )
+    )
 
 
 @server.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)
-def on_changed(ls: CraftLanguageServer, params: lsp.DidOpenTextDocumentParams) -> None:
-    """Parse each document when it is changed."""
+def on_changed(
+    ls: CraftLanguageServer, params: lsp.DidChangeTextDocumentParams
+) -> None:
+    """Parse a document when it is edited."""
     uri = params.text_document.uri
-    diagnostics = []
-
-    match ls.parse_file(uri):
-        case IndexEntry(
-            validator, instance=instance, segments=segments, version=version
-        ):
-            diagnostics.extend(get_diagnostics(validator, instance, segments))
-
-        case _:
-            return
-
-    shorten_messages(diagnostics)
+    tree, validator, instance, _, version = ls.parse_document(uri)
+    if validator:
+        diagnostics = get_diagnostics(tree, validator, instance)
+    else:
+        diagnostics = []
+    shorten_diagnostics_messages(diagnostics)
     server.text_document_publish_diagnostics(
-        lsp.PublishDiagnosticsParams(uri=uri, version=version, diagnostics=diagnostics)
+        lsp.PublishDiagnosticsParams(
+            uri=uri,
+            version=version,
+            diagnostics=diagnostics,
+        )
     )
+
+
+@server.feature(lsp.TEXT_DOCUMENT_DOCUMENT_SYMBOL)
+def document_symbols(
+    ls: CraftLanguageServer, params: lsp.DocumentSymbolParams
+) -> list[lsp.DocumentSymbol]:
+    """Return all the symbols defined in the given document."""
+    uri = params.text_document.uri
+    tree, *_ = ls.documents_index[uri]
+
+    return list_symbols(tree)
 
 
 @server.feature(lsp.TEXT_DOCUMENT_HOVER)
 def hover(ls: CraftLanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     """Get item description on hover."""
-    pos = params.position
     uri = params.text_document.uri
+    pos = params.position
+    tree, validator, *_ = ls.documents_index[uri]
 
-    match ls.get_or_update_index(uri):
-        case IndexEntry(validator_found, segments=segments):
-            validator = validator_found
-
-        case _:
-            return None
-
-    if not (path := get_node_path_from_token_position(position=pos, segments=segments)):
+    if not validator or not (
+        path := get_node_path_from_token_position(tree, position=pos)
+    ):
         return None
 
     description = get_description_from_path(
@@ -180,21 +199,6 @@ def hover(ls: CraftLanguageServer, params: lsp.HoverParams) -> lsp.Hover | None:
     )
 
 
-@server.feature(lsp.TEXT_DOCUMENT_DOCUMENT_SYMBOL)
-def document_symbol(
-    ls: CraftLanguageServer, params: lsp.DocumentSymbolParams
-) -> list[lsp.DocumentSymbol]:
-    """Return all the symbols defined in the given document."""
-    uri = params.text_document.uri
-    symbols_results: list[lsp.DocumentSymbol] = []
-
-    match ls.get_or_update_index(uri):
-        case IndexEntry(instance=instance, segments=segments):
-            symbols_results = list_symbols(instance, segments)
-
-    return symbols_results
-
-
 @server.feature(
     lsp.TEXT_DOCUMENT_COMPLETION, lsp.CompletionOptions(trigger_characters=[" "])
 )
@@ -202,21 +206,16 @@ def completions(
     ls: CraftLanguageServer, params: lsp.CompletionParams
 ) -> lsp.CompletionList | None:
     """Suggest next element based on the document structure."""
-    pos = params.position
     uri = params.text_document.uri
+    pos = params.position
+    tree, validator, instance, text, _ = ls.documents_index[uri]
     items = []
 
-    match ls.get_or_update_index(uri):
-        case IndexEntry(validator_found, instance=instance, tokens=tokens):
-            validator = validator_found
-
-        case _:
-            return None
-
-    path = get_exact_cursor_path(pos, tokens)
-    items = get_completion_items_from_path(
-        segments=path, schema=cast(Schema, validator.schema), instance=instance
-    )
+    if validator:
+        path = get_completion_path(tree, text, pos)
+        items = get_completion_items_from_path(
+            segments=path, schema=cast(Schema, validator.schema), instance=instance
+        )
 
     return lsp.CompletionList(is_incomplete=False, items=items)
 

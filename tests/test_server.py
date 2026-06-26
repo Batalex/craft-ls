@@ -29,7 +29,7 @@ async def client(lsp_client: LanguageClient):
 async def test_diagnostic_on_open(client: LanguageClient):
     """Ensure that the server implements diagnostics correctly."""
     # Given
-    test_uri = "file:///path/to/snapcraft.yaml"
+    uri = "file:///path/to/snapcraft.yaml"
     text_content = dedent(
         """
         name: my_snap
@@ -43,7 +43,7 @@ async def test_diagnostic_on_open(client: LanguageClient):
     client.text_document_did_open(
         params=types.DidOpenTextDocumentParams(
             text_document=types.TextDocumentItem(
-                uri=test_uri,
+                uri=uri,
                 language_id="yaml",
                 version=1,
                 text=text_content,
@@ -53,5 +53,82 @@ async def test_diagnostic_on_open(client: LanguageClient):
     await client.wait_for_notification(types.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
 
     # Then
-    assert (diagnostics := client.diagnostics.get(test_uri, []))
+    assert (diagnostics := client.diagnostics.get(uri, []))
     assert any(MISSING_TYPE_MSG in diagnostic.message for diagnostic in diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_completion_at_root_key(client: LanguageClient):
+    """Verify incomplete keys successfully suggest top-level fields (like confinement)."""
+    # Given
+    uri = "file:///workspace/snapcraft.yaml"
+    text_content = dedent(
+        """
+        base: core24
+        confi
+        """
+    )
+
+    # When
+    client.text_document_did_open(
+        params=types.DidOpenTextDocumentParams(
+            text_document=types.TextDocumentItem(
+                uri=uri,
+                language_id="yaml",
+                version=1,
+                text=text_content,
+            )
+        )
+    )
+
+    # Trigger completion right at the tip of 'confi' at line 1 (+offset 1)) col 5
+    response = await client.text_document_completion_async(
+        types.CompletionParams(
+            text_document=types.TextDocumentIdentifier(uri=uri),
+            position=types.Position(line=2, character=5),
+        )
+    )
+
+    # Then
+    assert response is not None
+    labels = [item.label for item in getattr(response, "items", [])]
+    assert "confinement" in labels
+
+
+@pytest.mark.asyncio
+async def test_completion_inside_value(client: LanguageClient):
+    """Verify value placements isolate sub-enums instead of root parameters."""
+    # Given
+    uri = "file:///workspace/snapcraft.yaml"
+    text_content = dedent(
+        """
+        base: core24
+        confinement: st
+        """
+    )
+
+    # When
+    client.text_document_did_open(
+        params=types.DidOpenTextDocumentParams(
+            text_document=types.TextDocumentItem(
+                uri=uri,
+                language_id="yaml",
+                version=1,
+                text=text_content,
+            )
+        )
+    )
+
+    # Trigger completion past the colon at 'st' at line 1 (+offset 1)) col 15
+    response = await client.text_document_completion_async(
+        types.CompletionParams(
+            text_document=types.TextDocumentIdentifier(uri=uri),
+            position=types.Position(line=2, character=15),
+        )
+    )
+
+    # Then
+    assert response is not None
+    labels = [item.label for item in getattr(response, "items", [])]
+    assert "strict" in labels
+    assert "confinement" not in labels
