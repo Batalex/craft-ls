@@ -10,14 +10,24 @@ issues:
   - https://github.com/Batalex/craft-ls/issues/new
 
 adopt-info: craft-ls
-base: core24
+base: core26
 confinement: strict
 platforms:
   amd64:
   arm64:
 
 parts:
+  runtime:
+    plugin: nil
+    stage-packages:
+      - libpython3.14-minimal
+      - libpython3.14-stdlib
+      - python3-minimal
+      - python3.14-minimal
+      - python3.14-venv
+
   craft-ls:
+    after: [runtime]
     plugin: uv
     source: .
     build-snaps:
@@ -25,8 +35,6 @@ parts:
     override-build: |
       craftctl set version="$(cat src/craft_ls/__init__.py | cut -d '"' -f2 | xargs)"
       craftctl default
-    stage-packages:
-      - python3-venv
 
 apps:
   craft-ls:
