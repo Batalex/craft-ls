@@ -9,8 +9,11 @@ from pathlib import Path
 
 from lsprotocol import types as lsp
 
-from craft_ls.core import get_diagnostics, get_validator_and_parse, segmentize_nodes
-from craft_ls.types_ import ParsedResult
+from craft_ls.core import (
+    get_diagnostics,
+    get_validator_from_tree,
+)
+from craft_ls.parser import parser, yaml_tree_to_dict
 
 logging.basicConfig()
 
@@ -19,15 +22,17 @@ def check(file_name: str) -> None:
     """Report all violations for a file."""
     file = Path(file_name)
 
-    diagnostics: list[lsp.Diagnostic] = []
-    match get_validator_and_parse(file.stem, file.read_text()):
-        case None:
-            print(f"Cannot validate '{file}'", file=sys.stderr)
-            pass
+    with file.open("rb") as f:
+        tree = parser.parse(f.read())
 
-        case validator, ParsedResult(instance=instance, nodes=nodes):
-            segments = segmentize_nodes(nodes)
-            diagnostics.extend(get_diagnostics(validator, instance, dict(segments)))
+    validator = get_validator_from_tree(file.stem, tree)
+    instance = yaml_tree_to_dict(tree)
+
+    if not validator:
+        print(f"Cannot validate '{file}'", file=sys.stderr)
+        sys.exit(1)
+
+    diagnostics: list[lsp.Diagnostic] = get_diagnostics(tree, validator, instance)
 
     if diagnostics:
         for diag in diagnostics:

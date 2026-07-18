@@ -1,73 +1,29 @@
 """Types module."""
 
+from __future__ import annotations
+
 from collections import deque
-from dataclasses import dataclass
-from typing import Any, Generator, NewType
+from typing import Any, Generator, NamedTuple, NewType, TypeAlias
 
 from jsonschema import ValidationError, Validator
-from lsprotocol import types as lsp
-from yaml import CollectionNode, Mark, Token
+from tree_sitter import Tree
 
 # We can probably do better, but that will do for now
 YamlDocument = NewType("YamlDocument", dict[str, Any])
 Schema = NewType("Schema", dict[str, Any])
 
 
-@dataclass
-class ParsedResult:
-    """Token parsed result container."""
-
-    tokens: list[Token]
-    instance: YamlDocument
-    nodes: CollectionNode
-
-
-@dataclass
-class CompleteParsedResult(ParsedResult):
-    """Indicate a complete document parsing."""
-
-    pass
-
-
-@dataclass
-class IncompleteParsedResult(ParsedResult):
-    """Indicate an incomplete parsing of the document."""
-
-    pass
-
-
-@dataclass
-class DocumentNode:
-    """Document node."""
-
-    value: str
-    start: Mark
-    end: Mark
-    selection_end: Mark
-
-    def contains(self, position: lsp.Position) -> bool:
-        """Is position contained in node range?"""
-        range_start_before = self.start.line < position.line or (
-            self.start.line == position.line and self.start.column <= position.character
-        )
-
-        range_end_after = self.selection_end.line > position.line or (
-            self.selection_end.line == position.line
-            and self.selection_end.column >= position.character
-        )
-
-        return range_start_before and range_end_after
-
-
-@dataclass
-class IndexEntry:
+class IndexEntry(NamedTuple):
     """Document index entry."""
 
-    validator: Validator
-    tokens: list[Token]
+    tree: Tree
+    validator: Validator | None
     instance: YamlDocument
-    segments: dict[tuple[str, ...], DocumentNode]
+    text: str
     version: int | None
+
+
+DocumentsIndex: TypeAlias = dict[str, IndexEntry]
 
 
 class MissingTypeCharmcraftValidator:

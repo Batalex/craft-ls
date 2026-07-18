@@ -30,7 +30,8 @@
           pyyaml
           jsonref
           referencing
-          more-itertools
+          tree-sitter
+          tree-sitter-yaml
         ];
       };
 

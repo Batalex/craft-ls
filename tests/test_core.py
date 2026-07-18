@@ -1,5 +1,4 @@
 import json
-from collections import deque
 from itertools import chain
 from textwrap import dedent
 
@@ -11,15 +10,14 @@ from lsprotocol import types as lsp
 
 from craft_ls.core import (
     MISSING_DESC,
+    get_completion_path,
     get_description_from_path,
     get_diagnostic_range,
     get_diagnostics,
-    get_exact_cursor_path,
     get_node_path_from_token_position,
     list_symbols,
-    parse_tokens,
-    segmentize_nodes,
 )
+from craft_ls.parser import parser
 
 # Adapted from json-schema.org
 schema = json.loads(
@@ -71,8 +69,8 @@ price:
   currency: euro
 """
 
-parsed_document = parse_tokens(document)
-document_segments = segmentize_nodes(parsed_document.nodes)
+
+parsed_tree = parser.parse(document.encode("utf-8"))
 
 
 def test_get_description_first_level_ok() -> None:
@@ -120,7 +118,7 @@ def test_get_node_path_from_position_first_level_ok() -> None:
     position = lsp.Position(2, 5)
 
     # When
-    path = get_node_path_from_token_position(position, dict(document_segments))
+    path = get_node_path_from_token_position(parsed_tree, position)
 
     # Then
     assert path == ("productId",)
@@ -131,7 +129,7 @@ def test_get_node_path_from_position_nested_ok() -> None:
     position = lsp.Position(5, 5)
 
     # When
-    path = get_node_path_from_token_position(position, dict(document_segments))
+    path = get_node_path_from_token_position(parsed_tree, position)
 
     # Then
     assert path == ("price", "amount")
@@ -142,7 +140,7 @@ def test_get_node_path_from_outside_ko() -> None:
     position = lsp.Position(1, 5)  # comment line
 
     # When
-    path = get_node_path_from_token_position(position, dict(document_segments))
+    path = get_node_path_from_token_position(parsed_tree, position)
 
     # Then
     assert not path
@@ -153,32 +151,32 @@ def test_get_node_path_from_value_ok() -> None:
     position = lsp.Position(4, 10)  # to the right of "price"
 
     # When
-    path = get_node_path_from_token_position(position, dict(document_segments))
+    path = get_node_path_from_token_position(parsed_tree, position)
 
     # Then
     assert path == ("price",)
 
 
-def test_get_cursor_path_from_token_ok() -> None:
+def test_get_completion_path_from_token_ok() -> None:
     # Given
     position = lsp.Position(4, 3)  # inside "price", current path should be root
 
     # When
-    path = get_exact_cursor_path(position, parsed_document.tokens)
+    path = get_completion_path(parsed_tree, document, position)
 
     # Then
-    assert path == deque([])
+    assert path == []
 
 
-def test_get_cursor_path_from_nested_key_ok() -> None:
+def test_get_completion_path_from_nested_key_ok() -> None:
     # Given
     position = lsp.Position(5, 4)  # inside "amount", current path should be "price"
 
     # When
-    path = get_exact_cursor_path(position, parsed_document.tokens)
+    path = get_completion_path(parsed_tree, document, position)
 
     # Then
-    assert path == deque(["price"])
+    assert path == ["price"]
 
 
 def test_get_cursor_path_from_value_ok() -> None:
@@ -186,10 +184,10 @@ def test_get_cursor_path_from_value_ok() -> None:
     position = lsp.Position(3, 15)  # inside "bar", current path should be "productName"
 
     # When
-    path = get_exact_cursor_path(position, parsed_document.tokens)
+    path = get_completion_path(parsed_tree, document, position)
 
     # Then
-    assert path == deque(["productName"])
+    assert path == ["productName"]
 
 
 def test_values_are_not_flagged() -> None:
@@ -207,11 +205,10 @@ def test_values_are_not_flagged() -> None:
           currency: euro
         """
     )
-    segments = dict(segmentize_nodes(parse_tokens(document).nodes))
-    parsed_document.nodes
+    tree = parser.parse(document.encode("utf-8"))
 
     # When
-    range_ = get_diagnostic_range(segments, ["productName"])
+    range_ = get_diagnostic_range(tree, ["productName"])
 
     # Then
     assert range_.start.line == 3
@@ -232,10 +229,11 @@ def test_multiple_unexpected_keys() -> None:
         baz: buz
         """
     )
-    segments = dict(segmentize_nodes(parse_tokens(document).nodes))
+    tree = parser.parse(document.encode("utf-8"))
+    instance = yaml.safe_load(document)
 
     # When
-    diagnostics = get_diagnostics(validator, yaml.safe_load(document), segments)
+    diagnostics = get_diagnostics(tree, validator, instance)
 
     # Then
     assert len(diagnostics) == 2
@@ -259,10 +257,10 @@ def test_list_symbols_correct_levels() -> None:
             non-included-key: 50
         """
     )
-    segments = dict(segmentize_nodes(yaml.compose(document)))
+    tree = parser.parse(document.encode("utf-8"))
 
     # When
-    symbols = list_symbols(yaml.safe_load(document), segments)
+    symbols = list_symbols(tree)
 
     # Then
     assert len(symbols) == 3
