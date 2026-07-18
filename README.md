@@ -61,7 +61,25 @@ If not automatically picked, you may configure it using the following key:
 ]
 ```
 
-TBD: neovim
+#### Neovim
+
+Add the following to your Neovim configuration (e.g., `~/.config/nvim/init.lua`
+or a plugin file):
+
+```lua
+vim.lsp.config("craft_ls", {
+  cmd = { "craft-ls" },
+  filetypes = { "yaml" },
+  root_markers = {
+    "snapcraft.yaml",
+    "rockcraft.yaml",
+    "charmcraft.yaml",
+    "snap",
+    ".git",
+  },
+})
+vim.lsp.enable("craft_ls")
+```
 
 ## Roadmap
 
