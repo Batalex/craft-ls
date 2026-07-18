@@ -2,12 +2,11 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1781074563,
-        "narHash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4=",
-        "rev": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
-        "revCount": 1014179,
+        "lastModified": 1784282293,
+        "narHash": "sha256-Qvf5DoKIqxiqvqHqp2BAXrwrA3ic5nMNA5DNagQB96I=",
+        "rev": "a47c123a609287a012dfc44d281de2dd4ed13394",
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/nixpkgs-weekly/0.1.1014179%2Brev-9ae611a455b90cf061d8f332b977e387bda8e1ca/019ef33c-03d6-7c80-8293-acac0bf146bb/source.tar.gz"
+        "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1036407.a47c123a6092/nixexprs.tar.xz"
       },
       "original": {
         "id": "nixpkgs",

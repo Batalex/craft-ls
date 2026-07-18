@@ -13,7 +13,7 @@
   }:
     utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
-      pythonPkgs = pkgs.python312Packages;
+      pythonPkgs = pkgs.python314Packages;
     in {
       packages.default = pythonPkgs.buildPythonPackage {
         pname = "craft-ls";
@@ -39,7 +39,7 @@
         # inputsFrom = [self.packages.${system}.default];
         packages = with pkgs; [
           uv
-          python312Packages.nox
+          python314Packages.nox
         ];
       };
     });
