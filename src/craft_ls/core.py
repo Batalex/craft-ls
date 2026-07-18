@@ -514,22 +514,22 @@ def get_completion_items_from_path(
         sub_schema = sub_schema.get("properties", {}).get(segment, {})
         sub_instance = sub_instance.get(segment, {})
 
-    already_present = (
-        set(sub_instance.keys()) if isinstance(sub_instance, dict) else set()
-    )
-    items = []
+    if (const_val := sub_schema.get("const")) is not None:
+        return [lsp.CompletionItem(label=str(const_val))]
 
-    if "cons" in sub_schema.keys():
-        items = [lsp.CompletionItem(label=str(key)) for key in [sub_schema["cons"]]]
+    all_schemas = [sub_schema] + [
+        item for c in ("anyOf", "oneOf", "allOf") for item in sub_schema.get(c, [])
+    ]
 
-    elif "enum" in sub_schema.keys():
-        items = [
-            lsp.CompletionItem(label=str(key)) for key in sub_schema["enum"] if key
+    properties_keys = {key for s in all_schemas for key in s.get("properties", {})}
+    if properties_keys:
+        return [
+            lsp.CompletionItem(label=str(k))
+            for k in properties_keys - set(sub_instance)
         ]
 
-    elif "properties" in sub_schema.keys():
-        items = [
-            lsp.CompletionItem(label=str(key))
-            for key in set(sub_schema["properties"].keys()) - already_present
-        ]
-    return items
+    enums = [val for s in all_schemas for val in s.get("enum", []) if val]
+    if enums:
+        return [lsp.CompletionItem(label=str(val)) for val in dict.fromkeys(enums)]
+
+    return []
