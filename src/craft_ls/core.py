@@ -175,7 +175,11 @@ def get_snapcraft_validator(tree: Tree) -> Validator:
             )
 
         case _:
-            validator = MissingTypeSnapcraftValidator()
+            validator = MissingTypeSnapcraftValidator(
+                schema=snapcraft_registry.resolver()
+                .lookup("urn:snapcraft:core26")
+                .contents
+            )
 
     return cast(Validator, validator)
 
@@ -194,7 +198,14 @@ def get_validator_from_tree(file_stem: str, tree: Tree) -> Validator | None:
     else:
         # by elimination, file_stem is charmcraft
         if get_charm_type(tree) != "charm":
-            return cast(Validator, MissingTypeCharmcraftValidator())
+            return cast(
+                Validator,
+                MissingTypeCharmcraftValidator(
+                    charmcraft_registry.resolver()
+                    .lookup("urn:charmcraft:platformcharm")
+                    .contents
+                ),
+            )
 
         validator = cast(
             Validator,

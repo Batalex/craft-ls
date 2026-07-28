@@ -59,12 +59,15 @@ async def test_diagnostic_on_open(client: LanguageClient):
 
 @pytest.mark.asyncio
 async def test_completion_at_root_key(client: LanguageClient):
-    """Verify incomplete keys successfully suggest top-level fields (like confinement)."""
+    """Verify incomplete keys successfully suggest top-level fields (like confinement).
+
+    In addition, we check that we get some minimal level of feature even if we don't have
+    fully determined the schema to use.
+    """
     # Given
     uri = "file:///workspace/snapcraft.yaml"
     text_content = dedent(
         """
-        base: core24
         confi
         """
     )
@@ -81,11 +84,11 @@ async def test_completion_at_root_key(client: LanguageClient):
         )
     )
 
-    # Trigger completion right at the tip of 'confi' at line 1 (+offset 1)) col 5
+    # Trigger completion right at the tip of 'confi' at line 0 (+offset 1)) col 5
     response = await client.text_document_completion_async(
         types.CompletionParams(
             text_document=types.TextDocumentIdentifier(uri=uri),
-            position=types.Position(line=2, character=5),
+            position=types.Position(line=1, character=5),
         )
     )
 
