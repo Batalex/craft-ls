@@ -35,6 +35,9 @@ parts:
     override-build: |
       craftctl set version="$(cat src/craft_ls/__init__.py | cut -d '"' -f2 | xargs)"
       craftctl default
+    prime:
+      - -bin/python
+      - -bin/python3.14
 
 apps:
   craft-ls:
