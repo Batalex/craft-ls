@@ -11,7 +11,11 @@
     utils,
     ...
   }:
-    utils.lib.eachDefaultSystem (system: let
+    utils.lib.eachSystem [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+    ] (system: let
       pkgs = import nixpkgs {inherit system;};
       pythonPkgs = pkgs.python314Packages;
     in {
@@ -36,7 +40,6 @@
       };
 
       devShells.default = pkgs.mkShell {
-        # inputsFrom = [self.packages.${system}.default];
         packages = with pkgs; [
           uv
           python314Packages.nox
