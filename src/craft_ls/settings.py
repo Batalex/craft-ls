@@ -2,4 +2,4 @@
 
 import os
 
-IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV", False)
+IS_DEV_MODE = os.environ.get("CRAFT_LS_DEV", "") not in ("", "0")
