@@ -9,12 +9,21 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     """Application entrypoint."""
     from craft_ls import __version__
+    from craft_ls.schemas import SCHEMA_VERSIONS
 
     parser = argparse.ArgumentParser(prog="craft-ls")
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s {__version__}",
+        version="\n".join(
+            [
+                f"%(prog)s {__version__}",
+                *(
+                    f"  {tool}: {version}"
+                    for tool, version in sorted(SCHEMA_VERSIONS.items())
+                ),
+            ]
+        ),
     )
     subparsers = parser.add_subparsers()
     parser_check = subparsers.add_parser(
