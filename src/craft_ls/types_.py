@@ -6,7 +6,8 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Generator, NamedTuple, NewType, TypeAlias
 
-from jsonschema import ValidationError, Validator
+from jsonschema.exceptions import ValidationError
+from jsonschema.protocols import Validator
 from tree_sitter import Tree
 
 # We can probably do better, but that will do for now

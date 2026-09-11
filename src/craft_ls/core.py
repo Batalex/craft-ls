@@ -16,7 +16,7 @@ from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tree_sitter import Node, Tree
 
-from craft_ls.helpers import sanatize_key
+from craft_ls.helpers import sanitize_key
 from craft_ls.parser import (
     query_charm_type_keys,
     query_pairs,
@@ -443,11 +443,11 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
     # The first part of the query must always be a perfect match according to all
     # schemas. It's also better for performance.
     head, *tail = path
-    query = f"$.properties.{sanatize_key(str(head))}"
+    query = f"$.properties.{sanitize_key(str(head))}"
     if tail:
         sub_query = "..".join(
             [
-                f"'{sanatize_key(str(p))}'|additionalProperties|patternProperties"
+                f"'{sanitize_key(str(p))}'|additionalProperties|patternProperties"
                 for p in tail
             ]
         )

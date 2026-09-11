@@ -34,7 +34,11 @@ def check(file_name: str) -> None:
 
     diagnostics: list[lsp.Diagnostic] = get_diagnostics(tree, validator, instance)
 
+    for diag in diagnostics:
+        start = diag.range.start
+        print(
+            f"{start.line + 1}:{start.character + 1}: {diag.message}",
+            file=sys.stderr,
+        )
     if diagnostics:
-        for diag in diagnostics:
-            print(f"{diag.range.start.line}: {diag.message}", file=sys.stderr)
         sys.exit(1)

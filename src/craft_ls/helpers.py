@@ -8,7 +8,7 @@ from lsprotocol import types as lsp
 MSG_SIZE = 79
 
 
-def sanatize_key(key: str) -> str:
+def sanitize_key(key: str) -> str:
     """Sanatize key."""
     return re.sub(r"""['"\\*]""", "", key)
 

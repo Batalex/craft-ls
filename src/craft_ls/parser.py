@@ -139,12 +139,13 @@ def node_to_dict(node: Node | None) -> Any:  # noqa: C901
     We have 4 different types to transform:
     1. Scalars
     2. Sequences
-    3. Transparent structures (not needed)
+    3. Transparent structures (stream, document, block/flow nodes)
     4. Mappings, including errors
-
-    A bit dirty, but it seems to work
     """
-    if not node or node.type in ("-", "---", "...", "MISSING", ":"):
+    if not node or node.is_missing or node.type in ("-", "---", "...", "MISSING", ":"):
+        return None
+
+    if node.type == "comment":
         return None
 
     if "scalar" in node.type:
@@ -163,12 +164,22 @@ def node_to_dict(node: Node | None) -> Any:  # noqa: C901
         )
         return node_to_dict(val_node) if val_node else None
 
-    # Bypass those ones
-    if (
-        node.type in ("stream", "document", "block_node", "flow_node")
-        and node.child_count == 1
-    ):
-        return node_to_dict(node.children[0])
+    # Bypass those ones: recurse into every child, merging mapping results.
+    # These wrappers can have several children, e.g. `stream` with leading
+    # comments, `document` with a `---` marker, or multiple documents. In all
+    # cases we still want to salvage the mappings they contain.
+    if node.type in ("stream", "document", "block_node", "flow_node"):
+        merged: dict[str, Any] | None = None
+        single: Any = None
+        for child in node.children:
+            value = node_to_dict(child)
+            if isinstance(value, dict):
+                if merged is None:
+                    merged = {}
+                merged.update(value)
+            elif value is not None:
+                single = value
+        return merged if merged is not None else single
 
     if node.type in ("block_mapping", "flow_mapping", "ERROR"):
         res = {}

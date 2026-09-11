@@ -98,6 +98,5 @@ strict = true
 [tool.pyright]
 enableReachabilityAnalysis = false # unreliable
 
-[tool.pytest]
+[tool.pytest.ini_options]
 log_cli_level = "INFO"
-asyncio_mode = "auto"
