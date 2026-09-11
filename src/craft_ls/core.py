@@ -115,73 +115,84 @@ def get_charm_type(tree: Tree) -> str | None:
     return charm_type
 
 
-def get_snapcraft_validator(tree: Tree) -> Validator:
-    """Get the most appropriate snapcraft validator for the current document."""
-    validator: Draft202012Validator | MissingTypeSnapcraftValidator
-    match get_snap_bases(tree):
+def _build_snapcraft_validator(base: str | None, build_base: str | None) -> Validator:
+    """Build the snapcraft validator matching the given base and build-base."""
+    match base, build_base:
         case "core22", _:
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:core22")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:core22").contents
             )
         case "core24", _:
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:core24")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:core24").contents
             )
         case "core26", _:
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:core26")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:core26").contents
             )
         case "bare", "core22":
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:bare22")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:bare22").contents
             )
         case "bare", "core24":
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:bare24")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:bare24").contents
             )
         case "bare", "core26":
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:bare26")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:bare26").contents
             )
         case _, "core22":
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:base22")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:base22").contents
             )
         case _, "core24":
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:base24")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:base24").contents
             )
         case _, "devel":
-            validator = Draft202012Validator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:basedevel")
-                .contents
+            schema = (
+                snapcraft_registry.resolver().lookup("urn:snapcraft:basedevel").contents
             )
-
         case _:
-            validator = MissingTypeSnapcraftValidator(
-                schema=snapcraft_registry.resolver()
-                .lookup("urn:snapcraft:core26")
-                .contents
+            return cast(
+                Validator,
+                MissingTypeSnapcraftValidator(
+                    schema=snapcraft_registry.resolver()
+                    .lookup("urn:snapcraft:core26")
+                    .contents
+                ),
             )
 
-    return cast(Validator, validator)
+    return cast(Validator, Draft202012Validator(schema=schema))
+
+
+def _build_charmcraft_validator(charm_type: str | None) -> Validator:
+    """Build the charmcraft validator matching the given charm type."""
+    if charm_type != "charm":
+        return cast(
+            Validator,
+            MissingTypeCharmcraftValidator(
+                charmcraft_registry.resolver()
+                .lookup("urn:charmcraft:platformcharm")
+                .contents
+            ),
+        )
+
+    return cast(
+        Validator,
+        Draft202012Validator(
+            schema=charmcraft_registry.resolver()
+            .lookup("urn:charmcraft:platformcharm")
+            .contents
+        ),
+    )
+
+
+# Validators only depend on the file type and the discriminator read from the
+# document (base/build-base or type), which rarely changes while editing, so
+# they are cached to avoid rebuilding them on every keystroke.
+validator_cache: dict[tuple[str | None, ...], Validator] = {}
 
 
 def get_validator_from_tree(file_stem: str, tree: Tree) -> Validator | None:
@@ -192,30 +203,21 @@ def get_validator_from_tree(file_stem: str, tree: Tree) -> Validator | None:
     if file_stem == "rockcraft":
         return default_validators[file_stem]
 
-    elif file_stem == "snapcraft":
-        validator = get_snapcraft_validator(tree)
-
+    if file_stem == "snapcraft":
+        base, build_base = get_snap_bases(tree)
+        key: tuple[str | None, ...] = ("snapcraft", base, build_base)
     else:
         # by elimination, file_stem is charmcraft
-        if get_charm_type(tree) != "charm":
-            return cast(
-                Validator,
-                MissingTypeCharmcraftValidator(
-                    charmcraft_registry.resolver()
-                    .lookup("urn:charmcraft:platformcharm")
-                    .contents
-                ),
-            )
+        charm_type = get_charm_type(tree)
+        key = ("charmcraft", charm_type)
 
-        validator = cast(
-            Validator,
-            Draft202012Validator(
-                schema=charmcraft_registry.resolver()
-                .lookup("urn:charmcraft:platformcharm")
-                .contents
-            ),
-        )
-    return validator
+    if key not in validator_cache:
+        if file_stem == "snapcraft":
+            validator_cache[key] = _build_snapcraft_validator(*key[1:])
+        else:
+            validator_cache[key] = _build_charmcraft_validator(key[1])
+
+    return validator_cache[key]
 
 
 def get_diagnostics(
