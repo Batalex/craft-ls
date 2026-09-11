@@ -9,9 +9,9 @@ nox.options.default_venv_backend = "uv"
 nox.options.reuse_venv = "yes"
 nox.options.sessions = ["fmt", "lint"]
 
-CHARM_VERSION = "4.2.1"
-SNAP_VERSION = "9.0.0"
-ROCK_VERSION = "1.19.0"
+CHARM_VERSION = "4.4.2"
+SNAP_VERSION = "9.0.1"
+ROCK_VERSION = "1.20.0"
 SNAPCRAFT_URL = f"https://raw.githubusercontent.com/canonical/snapcraft/refs/tags/{SNAP_VERSION}/schema/snapcraft.json"
 ROCKCRAFT_URL = f"https://raw.githubusercontent.com/canonical/rockcraft/refs/tags/{ROCK_VERSION}/schema/rockcraft.json"
 CHARMCRAFT_URL = f"https://raw.githubusercontent.com/canonical/charmcraft/refs/tags/{CHARM_VERSION}/schema/charmcraft.json"
