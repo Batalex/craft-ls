@@ -38,6 +38,9 @@ parts:
     prime:
       - -bin/python
       - -bin/python3.14
+    override-prime: |
+      craftctl default
+      ln -s ../usr/bin/python3.14 "$CRAFT_PRIME/bin/python"
 
 apps:
   craft-ls:

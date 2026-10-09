@@ -7,6 +7,9 @@ from hypothesis import assume, example, given
 from hypothesis import strategies as st
 from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
+from craft_ls.core import MissingTypeSnapcraftValidator, get_validator_from_tree
+from craft_ls.core import get_validator_from_tree
+import pytest
 
 from craft_ls.core import (
     MISSING_DESC,
@@ -269,3 +272,37 @@ def test_list_symbols_correct_levels() -> None:
     )
     assert len(children) == 1
     assert children[0].name == "included-key"
+
+
+@pytest.mark.parametrize(["build_base"], [["core22"], ["core24"]])
+def test_validator_selection_with_non_standard_base(build_base: str) -> None:
+    """A non-bare base with build-base core22/core24 must not crash.
+
+    These used to look up 'urn:snapcraft:base22'/'base24', which do not exist
+    in the bundled schema, raising referencing.exceptions.Unresolvable.
+    """
+    # Given
+    tree = parser.parse(
+        f"name: my-snap\nbase: core18\nbuild-base: {build_base}\nparts: {{}}\n".encode()
+    )
+
+    # When
+    validator = get_validator_from_tree("snapcraft", tree)
+
+    # Then
+    assert validator is not None
+    assert (
+        type(validator).__name__ == "Draft202012Validator"
+    )  # real validator, not missing-type no-op
+
+
+def test_validator_selection_unsupported_base_falls_back() -> None:
+    """A base/build-base combination matching no known schema should not crash."""
+    # Given
+    tree = parser.parse(b"name: my-snap\nbase: core18\nparts: {}\n")
+
+    # When
+    validator = get_validator_from_tree("snapcraft", tree)
+
+    # Then
+    assert type(validator) is MissingTypeSnapcraftValidator

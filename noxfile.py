@@ -1,5 +1,6 @@
 """Tasks definition for the nox runner."""
 
+import json
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -9,12 +10,21 @@ nox.options.default_venv_backend = "uv"
 nox.options.reuse_venv = "yes"
 nox.options.sessions = ["fmt", "lint"]
 
-CHARM_VERSION = "4.2.1"
-SNAP_VERSION = "9.0.0"
-ROCK_VERSION = "1.19.0"
-SNAPCRAFT_URL = f"https://raw.githubusercontent.com/canonical/snapcraft/refs/tags/{SNAP_VERSION}/schema/snapcraft.json"
-ROCKCRAFT_URL = f"https://raw.githubusercontent.com/canonical/rockcraft/refs/tags/{ROCK_VERSION}/schema/rockcraft.json"
-CHARMCRAFT_URL = f"https://raw.githubusercontent.com/canonical/charmcraft/refs/tags/{CHARM_VERSION}/schema/charmcraft.json"
+SCHEMA_VERSIONS: dict[str, str] = json.loads(
+    Path("src/craft_ls/schemas/versions.json").read_text(encoding="utf-8")
+)
+SNAPCRAFT_URL = (
+    f"https://raw.githubusercontent.com/canonical/snapcraft"
+    f"/refs/tags/{SCHEMA_VERSIONS['snapcraft']}/schema/snapcraft.json"
+)
+ROCKCRAFT_URL = (
+    f"https://raw.githubusercontent.com/canonical/rockcraft"
+    f"/refs/tags/{SCHEMA_VERSIONS['rockcraft']}/schema/rockcraft.json"
+)
+CHARMCRAFT_URL = (
+    f"https://raw.githubusercontent.com/canonical/charmcraft"
+    f"/refs/tags/{SCHEMA_VERSIONS['charmcraft']}/schema/charmcraft.json"
+)
 
 
 @nox.session()
