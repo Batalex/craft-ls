@@ -27,11 +27,29 @@ https://github.com/user-attachments/assets/e4b831b5-dcac-4efd-aabb-d3040899b52b
 
 ### Installation
 
-Using `uv` or `pipx`
+#### Using the snap
+
+```shell
+sudo snap install craft-ls --edge
+```
+
+#### Using a Nix flake
+
+```shell
+nix run github:Batalex/craft-ls
+```
+
+#### Using a Python environment
+
+Using `uv`
 
 ```shell
 uv tool install craft-ls
+```
 
+Using `pipx`
+
+```shell
 pipx install craft-ls
 ```
 
@@ -49,16 +67,16 @@ language-servers = ["craft-ls"]
 command = "craft-ls"
 ```
 
-#### VSCode
+#### Visual Studio Code
 
-The VSCode extension can be installed from the marketplace.
-It requires a Python 3.12 interpreter.
+The Visual Studio Code [extension](https://marketplace.visualstudio.com/items?itemName=abatisse.craft-ls) can be installed right from the editor.
+It requires a local `craft-ls` installation (see previous section).
 If not automatically picked, you may configure it using the following key:
 
 ```json
-"craft-ls.interpreter": [
-  "/usr/bin/python3.12"
-]
+{
+  "craft-ls.serverPath": "/home/user/.local/bin/craft-ls"
+}
 ```
 
 #### Neovim
@@ -80,24 +98,5 @@ vim.lsp.config("craft_ls", {
 })
 vim.lsp.enable("craft_ls")
 ```
-
-## Roadmap
-
-Project availability:
-
-- Python package
-- Snap
-- Nix flake
-- VSCode extension
-
-Features:
-
-- Diagnostics
-- Autocompletion **on typing**
-- Symbol documentation
-
-Ecosystem:
-
-- Encourage *craft tools to refine their JSONSchemas even further
 
 [^1]: snapcraft, rockcraft and partial support for charmcraft (all-in-one `charmcraft.yaml` only)
