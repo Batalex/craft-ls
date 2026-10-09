@@ -2,22 +2,22 @@ import json
 from itertools import chain
 from textwrap import dedent
 
+import pytest
 import yaml
 from hypothesis import assume, example, given
 from hypothesis import strategies as st
 from jsonschema.validators import validator_for
 from lsprotocol import types as lsp
-from craft_ls.core import MissingTypeSnapcraftValidator, get_validator_from_tree
-from craft_ls.core import get_validator_from_tree
-import pytest
 
 from craft_ls.core import (
     MISSING_DESC,
+    MissingTypeSnapcraftValidator,
     get_completion_path,
     get_description_from_path,
     get_diagnostic_range,
     get_diagnostics,
     get_node_path_from_token_position,
+    get_validator_from_tree,
     list_symbols,
 )
 from craft_ls.parser import parser

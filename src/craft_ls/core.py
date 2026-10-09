@@ -457,7 +457,7 @@ def get_description_from_path(path: Iterable[str | int], schema: Schema) -> str:
         )
         query = f"{query}..{sub_query}"
     query = f"{query}.description|title"
-    parser = jq(query)
+    parser = jq(query)  # type: ignore
     candidates = parser.find(schema)
 
     if candidates:
