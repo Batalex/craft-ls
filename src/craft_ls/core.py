@@ -143,12 +143,14 @@ def _build_snapcraft_validator(base: str | None, build_base: str | None) -> Vali
                 snapcraft_registry.resolver().lookup("urn:snapcraft:bare26").contents
             )
         case _, "core22":
+            # Non-bare base with build-base core22: there is no 'urn:snapcraft:base22'
             schema = (
-                snapcraft_registry.resolver().lookup("urn:snapcraft:base22").contents
+                snapcraft_registry.resolver().lookup("urn:snapcraft:core22").contents
             )
         case _, "core24":
+            # Same reasoning as above for build-base core24.
             schema = (
-                snapcraft_registry.resolver().lookup("urn:snapcraft:base24").contents
+                snapcraft_registry.resolver().lookup("urn:snapcraft:core24").contents
             )
         case _, "devel":
             schema = (
