@@ -112,6 +112,9 @@
         "start-timeout": {
           "anyOf": [
             {
+              "description": "A duration string to be parsed by snapd.",
+              "examples": ["2s", "3m", "4ms", "5us", "6m7s8ms"],
+              "pattern": "^([0-9]+(ns|us|ms|s|m)){1,5}$",
               "type": "string"
             },
             {
@@ -126,6 +129,9 @@
         "stop-timeout": {
           "anyOf": [
             {
+              "description": "A duration string to be parsed by snapd.",
+              "examples": ["2s", "3m", "4ms", "5us", "6m7s8ms"],
+              "pattern": "^([0-9]+(ns|us|ms|s|m)){1,5}$",
               "type": "string"
             },
             {
@@ -140,6 +146,9 @@
         "watchdog-timeout": {
           "anyOf": [
             {
+              "description": "A duration string to be parsed by snapd.",
+              "examples": ["2s", "3m", "4ms", "5us", "6m7s8ms"],
+              "pattern": "^([0-9]+(ns|us|ms|s|m)){1,5}$",
               "type": "string"
             },
             {
@@ -168,6 +177,9 @@
         "restart-delay": {
           "anyOf": [
             {
+              "description": "A duration string to be parsed by snapd.",
+              "examples": ["2s", "3m", "4ms", "5us", "6m7s8ms"],
+              "pattern": "^([0-9]+(ns|us|ms|s|m)){1,5}$",
               "type": "string"
             },
             {
@@ -239,7 +251,7 @@
             }
           ],
           "default": null,
-          "description": "Determines how the service should restart when the snap refreshes.",
+          "description": "For an app, determines whether the snap can refresh when the app is still running. For a service, determines whether the service should restart when the snap refreshes.",
           "examples": ["restart"],
           "title": "Refresh-Mode"
         },
@@ -1653,6 +1665,7 @@
             }
           ],
           "default": null,
+          "deprecated": true,
           "description": "The Ubuntu Pro (formerly Ubuntu Advantage) services to enable when building the snap.",
           "examples": ["[esm-apps]"],
           "title": "Ua-Services"
@@ -2240,6 +2253,7 @@
             }
           ],
           "default": null,
+          "deprecated": true,
           "description": "The Ubuntu Pro (formerly Ubuntu Advantage) services to enable when building the snap.",
           "examples": ["[esm-apps]"],
           "title": "Ua-Services"
@@ -2817,6 +2831,7 @@
             }
           ],
           "default": null,
+          "deprecated": true,
           "description": "The Ubuntu Pro (formerly Ubuntu Advantage) services to enable when building the snap.",
           "examples": ["[esm-apps]"],
           "title": "Ua-Services"
@@ -2932,6 +2947,21 @@
           "description": "Selects a part to inherit metadata from and reuse for the component's\nmetadata.\n\nOnly the component's version can be set.\n",
           "examples": ["foo-part"],
           "title": "Adopt-Info"
+        },
+        "compression": {
+          "anyOf": [
+            {
+              "enum": ["lzo", "xz"],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specifies the algorithm that compresses this component.",
+          "examples": ["xz", "lzo"],
+          "title": "Compression"
         }
       },
       "required": ["summary", "description", "type"],
@@ -4136,6 +4166,7 @@
             }
           ],
           "default": null,
+          "deprecated": true,
           "description": "The Ubuntu Pro (formerly Ubuntu Advantage) services to enable when building the snap.",
           "examples": ["[esm-apps]"],
           "title": "Ua-Services"
@@ -4732,6 +4763,7 @@
             }
           ],
           "default": null,
+          "deprecated": true,
           "description": "The Ubuntu Pro (formerly Ubuntu Advantage) services to enable when building the snap.",
           "examples": ["[esm-apps]"],
           "title": "Ua-Services"
@@ -5309,6 +5341,7 @@
             }
           ],
           "default": null,
+          "deprecated": true,
           "description": "The Ubuntu Pro (formerly Ubuntu Advantage) services to enable when building the snap.",
           "examples": ["[esm-apps]"],
           "title": "Ua-Services"
